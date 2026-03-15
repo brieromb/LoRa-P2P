@@ -3,13 +3,14 @@ import threading
 import serial
 import time
 from serial_helper_commands import send_command_read_response
+from serial_line_processor import SerialLineProcessor
 
 class LoRaNode:
 
     def __init__(self, port, baud=9600):
         self.port = port
+        self.line_processor = SerialLineProcessor()
         self.serial = serial.Serial(port, baud, timeout=1)
-        self.template_line_processor = lambda x: f"{self.port}: {x}"
         self.listening_thread = None
         self.stop_listening = threading.Event() # Flag to signal the listening thread to stop
 
@@ -70,7 +71,7 @@ class LoRaNode:
                         try:
                             text = line.decode('utf-8').strip()
                             if text:
-                                result = self.template_line_processor(text)
+                                result = self.line_processor.process_line(text)
                                 if result:
                                     print(result)
                                     #yield result
