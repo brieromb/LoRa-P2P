@@ -1,14 +1,17 @@
+import threading
+
 import serial
 import time
 from serial_helper_commands import send_command_read_response
 
 class LoRaNode:
-    listening=False
 
     def __init__(self, port, baud=9600):
         self.port = port
         self.serial = serial.Serial(port, baud, timeout=1)
         self.template_line_processor = lambda x: f"{self.port}: {x}"
+        self.listening_thread = None
+        self.stop_listening = threading.Event() # Flag to signal the listening thread to stop
 
         # Setting up the LoRa module
         # Test connection and set to test mode
@@ -35,18 +38,26 @@ class LoRaNode:
         self.set_listening(True)  # Resume listening
     
     def set_listening(self, listening: bool):
-        self.listening = listening
         if listening:
-            self.start_listening()
+            self.stop_listening.clear()
+            # Set the node to receive mode to listen for incoming packets
+            response = send_command_read_response(self.serial, "AT+TEST=RXLRPKT")
+            print(f"{self.port}: {response}")
+            # Start listening to the serial stream in a separate thread
+            self.listening_thread = threading.Thread(target=self.process_serial_stream)
+            self.listening_thread.start()
+        else:
+            self.stop_listening.set()
+            self.listening_thread.join()
+            self.listening_thread = None
 
-    def start_listening(self):
+    def process_serial_stream(self):
         """Listen for incoming packets and process them
         Based on the official pyserial docs: https://www.pyserial.org/docs/reading-data
         """
-        self.listening = True
         line_buffer = b''
         
-        while self.listening:
+        while not self.stop_listening.is_set():
             try:
                 # Read available data
                 if self.serial.in_waiting:
@@ -62,7 +73,7 @@ class LoRaNode:
                                 result = self.template_line_processor(text)
                                 if result:
                                     print(result)
-                                    yield result
+                                    #yield result
                         except Exception as e:
                             print(f"Process error: {e}")
                 else:
