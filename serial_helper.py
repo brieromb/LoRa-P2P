@@ -1,0 +1,66 @@
+import time
+
+import serial
+import string
+from pyserial_docs_code.threaded_serial_reader2 import ThreadedSerialReader
+from pyserial_docs_code.serial_write_with_confirm import write_with_confirm
+
+
+class SerialHelper:
+    def __init__(self, ser: serial.Serial):
+        self.ser = ser
+        self.threaded_serial_reader = ThreadedSerialReader(ser)
+        self.threaded_serial_reader.start()
+
+    def check_connection(self) -> bool:
+        return self._write_command_and_check_response(b'AT\r\n', b'+AT: OK')
+    
+    def enable_test_mode(self) -> bool:
+        return self._write_command_and_check_response(b'AT+MODE=TEST\r\n', b'+MODE: TEST')
+    
+    def enable_listening(self) -> bool:
+        success = self._write_command_and_check_response(b'AT+TEST=RXLRPKT\r\n', b'+TEST: RXLRPKT')
+        if not success:
+            raise RuntimeError("Couldn't enter listening mode")
+        else:
+            self.threaded_serial_reader.resume()
+            return success
+    
+    def send_message(self, hex_message: str):
+        # Check if the message is a hex string.
+        assert all(c in string.hexdigits for c in hex_message)
+        # Add a 0 in the beginning if the hex message length is uneven
+        if len(hex_message)%2 == 1:
+            hex_message = "0" + hex_message
+        
+        command = (f'AT+TEST=TXLRPKT, "{hex_message}"\r\n').encode()
+        response = (f'+TEST: TXLRPKT "{hex_message}"\r\n+TEST: TX DONE').encode()
+    
+        return self._write_command_and_check_response(command, response)
+
+    def _write_command_and_check_response(self, command, expected_response) -> bool:
+        ####if not self.threaded_serial_reader.is_paused():
+        ####    raise RuntimeError("should first pause the threaded serial reader before trying to write a command.")
+        self.threaded_serial_reader.pause()
+
+        (success, _, response) = write_with_confirm(self.ser, command, expected_response)
+
+        if not success:
+            print(f"⚠️ WARNING: AT command '{command}' got unexpected response: '{response}'. Expected '{expected_response}' instead.")
+        return success
+
+
+if __name__ == '__main__':
+    ser = serial.Serial('COM4')
+    helper = SerialHelper(ser)
+
+    print(f"Connection OK: {helper.check_connection()}")
+    print(f"Test mode OK: {helper.enable_test_mode()}")
+    print(f"Listening OK: {helper.enable_listening()}")
+    time.sleep(3)
+    print(f"Sending OK: {helper.send_message("0123456789ABCDEF")}")
+    time.sleep(3)
+
+    
+
+

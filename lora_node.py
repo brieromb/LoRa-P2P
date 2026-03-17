@@ -37,7 +37,7 @@ class LoRaNode(EitherListenOrSendNodeInterface):
         print(f"{self.port}: {response}")
 
         # Set a default callback for received messages, can be overridden by set_on_received_callback
-        self.set_on_received_callback_and_start_listening(lambda x: print(f"Received: {x}")) 
+        self.set_on_received_callback_and_start_listening(lambda x: print(f"{port} received: {x}")) 
 
     @override
     def _send_while_not_listening(self, data):
