@@ -1,83 +1,65 @@
-import threading
+from typing import override
 
 import serial
-import time
-from serial_helper_commands import send_command_read_response
 from serial_line_processor import SerialLineProcessor
+from either_listen_or_send_node_interface import EitherListenOrSendNodeInterface
+from threaded_serial_reader import ThreadedSerialReader
 
-class LoRaNode:
+def basic_serial_send(ser: serial.Serial, command: str):
+    ser.write(command.encode() + b'\r\n')
+
+class LoRaNode(EitherListenOrSendNodeInterface):
 
     def __init__(self, port, baud=9600):
         self.port = port
+    
         self.line_processor = SerialLineProcessor()
+
         self.serial = serial.Serial(port, baud, timeout=1)
-        self.listening_thread = None
-        self.stop_listening = threading.Event() # Flag to signal the listening thread to stop
-        self.on_received = lambda x: print(f"Received: {x}") # Default callback for received messages, can be overridden by set_on_received_callback
+
+        self.threaded_serial_reader: ThreadedSerialReader = ThreadedSerialReader(self.serial, queue_size=1000)
+        # When in listening mode,
+        # we want to redirect incoming data to the callback instead of the queue
+        self.threaded_serial_reader.set_redirect_data_callback(
+            self.receive
+        )
+        self.threaded_serial_reader.start()
+        print(f"SERIAL READER WAS CREATED: {self.threaded_serial_reader}")
 
         # Setting up the LoRa module
         # Test connection and set to test mode
-        response = send_command_read_response(self.serial, "AT")
+        basic_serial_send(self.serial, "AT")
+        print(f"SERIAL READER IS NOW: {self.threaded_serial_reader}")
+        response = self.threaded_serial_reader.get_data(timeout=1)
         print(f"{self.port}: {response}")
-        response = send_command_read_response(self.serial, "AT+MODE=TEST")
+        basic_serial_send(self.serial, "AT+MODE=TEST")
+        response = self.threaded_serial_reader.get_data(timeout=1)
         print(f"{self.port}: {response}")
 
+        # Set a default callback for received messages, can be overridden by set_on_received_callback
+        self.set_on_received_callback_and_start_listening(lambda x: print(f"Received: {x}")) 
+
+    @override
+    def _send_while_not_listening(self, data):
+        basic_serial_send(self.serial, f"AT+TEST=TXLRPKT, {data}")
+        response = self.threaded_serial_reader.get_data(timeout=1)
+        print(f"{self.port}: {response}")
+
+    @override
+    def _enable_listening(self):
         # Set the node to receive mode to listen for incoming packets
-        self._set_listening(True)
-    
-    def send(self, data):
-        self._set_listening(False)  # Cannot listen while sending
-        response = send_command_read_response(self.serial, f"AT+TEST=TXLRPKT, {data}")
+        basic_serial_send(self.serial, "AT+TEST=RXLRPKT")
+        response = self.threaded_serial_reader.get_data(timeout=1)
         print(f"{self.port}: {response}")
-        self._set_listening(True)  # Resume listening
-    
-    def set_on_received_callback(self, callback):
-        self.on_received = callback
-    
-    def _set_listening(self, listening: bool):
-        if listening:
-            self.stop_listening.clear()
-            # Set the node to receive mode to listen for incoming packets
-            response = send_command_read_response(self.serial, "AT+TEST=RXLRPKT")
-            print(f"{self.port}: {response}")
-            # Start listening to the serial stream in a separate thread
-            self.listening_thread = threading.Thread(target=self._process_serial_stream)
-            self.listening_thread.start()
-        else:
-            self.stop_listening.set()
-            self.listening_thread.join()
-            self.listening_thread = None
+        self.threaded_serial_reader.toggle_redirect_data(True) # Redirect incoming data to the callback instead of the queue
 
-    def _process_serial_stream(self):
-        """Listen for incoming packets and process them
-        Based on the official pyserial docs: https://www.pyserial.org/docs/reading-data
-        """
-        line_buffer = b''
-        
-        while not self.stop_listening.is_set():
-            try:
-                # Read available data
-                if self.serial.in_waiting:
-                    chunk = self.serial.read(self.serial.in_waiting)
-                    line_buffer += chunk
-                    
-                    # Process complete lines
-                    while b'\n' in line_buffer:
-                        line, line_buffer = line_buffer.split(b'\n', 1)
-                        try:
-                            text = line.decode('utf-8').strip()
-                            if text:
-                                result = self.line_processor.process_line(text)
-                                if result:
-                                    self.on_received(result)
-                        except Exception as e:
-                            print(f"Process error: {e}")
-                else:
-                    time.sleep(0.1) # Sleep time can be way higher. Lines don't get lost due to sleeping because there is a serial buffer. 
-            except KeyboardInterrupt:
-                break
-            except Exception as e:
-                print(f"Stream error: {e}")
-    
+    @override
+    def _stop_listening(self):
+        # The LoRa module automatically stops listening when a message is sent.
+        # But we do need to stop redirecting the data, so that we can look at the response on our commands.
+        self.threaded_serial_reader.toggle_redirect_data(False)
 
-    
+    @override
+    def is_listening(self):
+        return self.threaded_serial_reader.is_redirecting()
+

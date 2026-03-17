@@ -1,3 +1,4 @@
+from either_listen_or_send_node_interface import ReceivedMessage
 
 class SerialLineProcessor:
 
@@ -37,20 +38,3 @@ class SerialLineProcessor:
         else:
             print(f"Warning: Received non-packet line: {line}")
             return None
-
-class ReceivedMessage:
-    def __init__(self, metadata = {}):
-        self.metadata = metadata # Dictionary to hold metadata key-value pairs
-        self.payload = None # The actual payload of the message, to be set later when the payload line is received
-
-    def set_payload(self, hexpayload: str):
-        self.payload = bytes.fromhex(hexpayload)
-    
-    def has_payload(self):
-        return self.payload is not None
-    
-    def get_payload(self):
-        return self.payload
-    
-    def __str__(self):
-        return f"ReceivedMessage(metadata={self.metadata}, payload={self.payload})"
