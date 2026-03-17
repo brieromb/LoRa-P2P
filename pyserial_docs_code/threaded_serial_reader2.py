@@ -1,9 +1,6 @@
 import threading
 import queue
 import time
-import serial
-
-from serial_write_with_confirm import write_with_confirm
 
 class ThreadedSerialReader:
     """ee https://www.pyserial.org/docs/reading-data"""
@@ -19,6 +16,9 @@ class ThreadedSerialReader:
     
     def resume(self):
         self.blocked.clear()
+    
+    def is_paused(self):
+        return self.blocked.is_set()
     
     def start(self):
         """Start background reading thread"""
@@ -65,7 +65,12 @@ class ThreadedSerialReader:
         self.running = False
         if self.thread:
             self.thread.join(timeout=None)
+    
+    def __del__(self):
+        """Stop the running thread when the object gets deleted"""
+        self.stop()
 
+"""
 if __name__ == '__main__':
     # EXAMPLE USAGE
     ser = serial.Serial(port="COM5", baudrate=9600, timeout=1)
@@ -88,3 +93,4 @@ if __name__ == '__main__':
             time.sleep(0.1)
     finally:
         reader.stop()
+"""
