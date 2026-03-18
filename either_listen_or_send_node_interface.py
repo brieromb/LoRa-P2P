@@ -1,25 +1,5 @@
 from typing import final
-
-class ReceivedMessage:
-    def __init__(self, metadata = {}, payload = None):
-        self.metadata = metadata # Dictionary to hold metadata key-value pairs
-        # The actual payload of the message can be set later too.
-        self.payload = None
-        if payload is not None:
-            self.set_payload(payload)
-
-    def set_payload(self, hexpayload: str):
-        self.payload = bytes.fromhex(hexpayload)
-    
-    def has_payload(self):
-        return self.payload is not None
-    
-    def get_payload(self):
-        return self.payload
-    
-    def __str__(self):
-        return f"ReceivedMessage(metadata={self.metadata}, payload={self.payload})"
-
+from pyserial_docs_code.received_message_data_handler import ReceivedMessage
 
 class EitherListenOrSendNodeInterface:
     """Interface for a node that can either listen or send messages,

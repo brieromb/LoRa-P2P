@@ -30,6 +30,9 @@ if __name__ == '__main__':
     # Send the message from ser2
     print(write_with_confirm(ser2, command, response))
 
+    # Give the response some time to arrive
+    time.sleep(3)
+    """
     # Read the response from ser1
     try:
         while True:
@@ -41,7 +44,7 @@ if __name__ == '__main__':
             time.sleep(0.1)
     finally:
         reader.stop()
-
+    """
 
 
 

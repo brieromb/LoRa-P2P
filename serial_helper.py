@@ -7,9 +7,11 @@ from pyserial_docs_code.serial_write_with_confirm import write_with_confirm
 
 
 class SerialHelper:
-    def __init__(self, ser: serial.Serial):
+    def __init__(self, ser: serial.Serial, received_message_handler=lambda x: print(x)):
+
         self.ser = ser
-        self.threaded_serial_reader = ThreadedSerialReader(ser)
+        # Set the callback that handles the received messages
+        self.threaded_serial_reader = ThreadedSerialReader(ser, on_receive_callback=received_message_handler)
         self.threaded_serial_reader.start()
 
     def check_connection(self) -> bool:
@@ -23,6 +25,7 @@ class SerialHelper:
         if not success:
             raise RuntimeError("Couldn't enter listening mode")
         else:
+            # IMPORTANT: resume the listening thread
             self.threaded_serial_reader.resume()
             return success
     
@@ -57,9 +60,19 @@ if __name__ == '__main__':
     print(f"Connection OK: {helper.check_connection()}")
     print(f"Test mode OK: {helper.enable_test_mode()}")
     print(f"Listening OK: {helper.enable_listening()}")
-    time.sleep(3)
-    print(f"Sending OK: {helper.send_message("0123456789ABCDEF")}")
-    time.sleep(3)
+    time.sleep(1)
+
+
+    ser2 = serial.Serial('COM5')
+    helper2 = SerialHelper(ser2)
+
+    print(f"Connection OK: {helper2.check_connection()}")
+    print(f"Test mode OK: {helper2.enable_test_mode()}")
+    print(f"Sending OK: {helper2.send_message("0123456789ABCDEF")}")
+    time.sleep(1)
+
+    # TODO Check if the message was correctly received
+
 
     
 
