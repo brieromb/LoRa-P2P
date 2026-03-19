@@ -8,5 +8,4 @@ if __name__ == "__main__":
     node2 = LoRaNode("COM5")
 
     time.sleep(2)  # Give the nodes some time to set up and start listening
-    print(node2.stop_listening.is_set())
     node1.send("AABBCCDD")
