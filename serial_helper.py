@@ -2,7 +2,7 @@ import time
 
 import serial
 import string
-from pyserial_docs_code.threaded_serial_reader2 import ThreadedSerialReader
+from pyserial_docs_code.threaded_serial_reader import ThreadedSerialReader
 from pyserial_docs_code.serial_write_with_confirm import write_with_confirm
 
 from received_message_data_handler import ReceivedMessageDataHandler

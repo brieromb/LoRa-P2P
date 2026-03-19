@@ -2,7 +2,6 @@ from enum import Enum
 import threading
 from lora_node import LoRaNode
 from queue import Queue
-from serial_line_processor import ReceivedMessage
 
 class TransmissionState(Enum):
     UNACKNOWLEDGED = 1
