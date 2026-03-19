@@ -1,5 +1,5 @@
 from typing import final
-from pyserial_docs_code.received_message_data_handler import ReceivedMessage
+from received_message_data_handler import ReceivedMessage
 
 class EitherListenOrSendNodeInterface:
     """Interface for a node that can either listen or send messages,

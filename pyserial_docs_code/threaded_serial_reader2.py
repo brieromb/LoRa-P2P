@@ -2,11 +2,9 @@ import threading
 import queue
 import time
 
-from pyserial_docs_code.received_message_data_handler import ReceivedMessageDataHandler
-
 class ThreadedSerialReader:
     """A class that monitors a serial port using a separate thread.
-    It uses an incoming message parser and returns the parsed messages to a given callback.
+    It returns the received lines to a given callback.
     It can be paused and resumed asynchronously.
     
     This class was inspired by the threaded reader and process serial stream from the official pyserial docs.
@@ -15,14 +13,13 @@ class ThreadedSerialReader:
     The addition that the thread can be paused and resumed asynchronously was not originally in there.
     """
 
-    def __init__(self, ser,  on_receive_callback=lambda received: print(f'Received: {received}')):
+    def __init__(self, ser,  received_line_handler=lambda received: print(f'Received: {received}')):
         self.ser = ser
         self.data_queue = queue.Queue(maxsize=1000)
         self.running = True
         self.thread = None
         self.blocked = threading.Event() # Own addition to allow for pausing of the ThreadedSerialReader.
-        self.on_receive_callback = on_receive_callback
-        self.received_message_data_handler = ReceivedMessageDataHandler()
+        self.received_line_handler = received_line_handler
 
     def pause(self):
         self.blocked.set()
@@ -56,9 +53,7 @@ class ThreadedSerialReader:
                             text = line.decode('utf-8').strip()
                             if text:
                                 # Parse the message line
-                                result = self.received_message_data_handler.process_message_line(text)
-                                if result:
-                                    self.on_receive_callback(result)
+                                self.received_line_handler(text)
                         except Exception as e:
                             print(f"Process error: {e}")
                 else:

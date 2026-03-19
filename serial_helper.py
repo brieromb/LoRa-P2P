@@ -5,13 +5,19 @@ import string
 from pyserial_docs_code.threaded_serial_reader2 import ThreadedSerialReader
 from pyserial_docs_code.serial_write_with_confirm import write_with_confirm
 
+from received_message_data_handler import ReceivedMessageDataHandler
+
 
 class SerialHelper:
     def __init__(self, ser: serial.Serial, received_message_handler=lambda x: print(x)):
 
         self.ser = ser
+        self.received_message_handler = received_message_handler
+        
         # Set the callback that handles the received messages
-        self.threaded_serial_reader = ThreadedSerialReader(ser, on_receive_callback=received_message_handler)
+        self.received_message_data_handler = ReceivedMessageDataHandler()
+
+        self.threaded_serial_reader = ThreadedSerialReader(ser, received_line_handler=self.handle_incoming_message_line)
         self.threaded_serial_reader.start()
 
     def check_connection(self) -> bool:
@@ -40,6 +46,12 @@ class SerialHelper:
         response = (f'+TEST: TXLRPKT "{hex_message}"\r\n+TEST: TX DONE').encode()
     
         return self._write_command_and_check_response(command, response)
+
+    def handle_incoming_message_line(self, line):
+        result = self.received_message_data_handler.process_message_line(line)
+        if result:
+            # Give the message to the callback that handles the ReceivedMessages.
+            self.received_message_handler(result)
 
     def _write_command_and_check_response(self, command, expected_response) -> bool:
         ####if not self.threaded_serial_reader.is_paused():
