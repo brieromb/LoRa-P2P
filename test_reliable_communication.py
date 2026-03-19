@@ -8,4 +8,4 @@ if __name__ == "__main__":
     reliable_node1 = ReliableCommunicatingNode(node1)
     reliable_node2 = ReliableCommunicatingNode(node2)
 
-    reliable_node1.send_reliably("AABBCCDD")
+    reliable_node1.send_reliably("HELLO WORLD".encode("utf-8"))

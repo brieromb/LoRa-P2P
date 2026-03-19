@@ -17,7 +17,10 @@ class SerialHelper:
         # Set the callback that handles the received messages
         self.received_message_data_handler = ReceivedMessageDataHandler()
 
-        self.threaded_serial_reader = ThreadedSerialReader(ser, received_line_handler=self.handle_incoming_message_line)
+        self.threaded_serial_reader = ThreadedSerialReader(
+            ser,
+            received_line_handler=self.handle_incoming_message_line
+        )
         self.threaded_serial_reader.start()
 
     def check_connection(self) -> bool:
@@ -35,12 +38,17 @@ class SerialHelper:
             self.threaded_serial_reader.resume()
             return success
     
-    def send_message(self, hex_message: str):
+    def send_message(self, payload: bytes):
+        # Need to send the payload as a hex string via the AT commands.
+        hex_message = payload.hex()
         # Check if the message is a hex string.
         assert all(c in string.hexdigits for c in hex_message)
         # Add a 0 in the beginning if the hex message length is uneven
         if len(hex_message)%2 == 1:
             hex_message = "0" + hex_message
+        
+        # letters to upper case, because the received response always is received in upper case
+        hex_message = hex_message.upper()
         
         command = (f'AT+TEST=TXLRPKT, "{hex_message}"\r\n').encode()
         response = (f'+TEST: TXLRPKT "{hex_message}"\r\n+TEST: TX DONE').encode()
@@ -63,6 +71,9 @@ class SerialHelper:
         if not success:
             print(f"⚠️ WARNING: AT command '{command}' got unexpected response: '{response}'. Expected '{expected_response}' instead.")
         return success
+    
+    def is_listening(self) -> bool:
+        return not self.threaded_serial_reader.is_paused()
 
 
 if __name__ == '__main__':
@@ -80,7 +91,7 @@ if __name__ == '__main__':
 
     print(f"Connection OK: {helper2.check_connection()}")
     print(f"Test mode OK: {helper2.enable_test_mode()}")
-    print(f"Sending OK: {helper2.send_message("0123456789ABCDEF")}")
+    print(f"Sending OK: {helper2.send_message(bytes.fromhex("0123456789ABCDEF"))}")
     time.sleep(1)
 
     # TODO Check if the message was correctly received

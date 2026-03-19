@@ -13,7 +13,8 @@ class Transmission():
     """
     Represents a message transmission with its state and retry information."""
 
-    def __init__(self, send_data, max_retries: int, timeout: float):
+    def __init__(self, send_data: bytes, max_retries: int, timeout: float):
+        assert(isinstance(send_data, bytes))
         self.send_data = send_data
         self.max_retries = max_retries
         self.timeout = timeout
@@ -102,12 +103,12 @@ class ReliableCommunicatingNode:
                     self.current_transmission = None # Clear the current transmission before handling the next one in the queue
                     self._handle_next_in_send_queue()
                 else:
-                    print(f"Received ACK for unknown message: {acked_message}")
+                    print(f"Received ACK for unknown message: {acked_message}. Expected an ACK for {self.current_transmission.send_data}")
             else:
                 # Send an acknowledgement back to the sender for the received message
                 print(f"Received message: {payload}")
                 # Send an acknowledgement back to the sender
                 ack_message = b"ACK:" + payload
-                self.lora_node.send(ack_message.hex())
+                self.lora_node.send(ack_message)
         else:
             print(f"Warning: Received message without payload: {message}")

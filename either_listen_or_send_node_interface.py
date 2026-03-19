@@ -18,12 +18,11 @@ class EitherListenOrSendNodeInterface:
         pass
 
     @final
-    def set_on_received_callback_and_start_listening(self, callback) -> None:
+    def set_on_received_callback(self, callback) -> None:
         self.on_received_callback = callback
-        self._enable_listening()
 
     @final
-    def send(self, data):
+    def send(self, data: bytes):
         """Prepares the node for sending a message by stopping listening,
         then sends the message, and finally resumes listening."""
         # Implement sending logic here
@@ -31,7 +30,7 @@ class EitherListenOrSendNodeInterface:
         self._send_while_not_listening(data) # Send the message
         self._enable_listening() # Resume listening after sending
 
-    def _send_while_not_listening(self, data) -> None:
+    def _send_while_not_listening(self, data: bytes) -> None:
         pass
 
     @final
