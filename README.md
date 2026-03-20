@@ -1,6 +1,49 @@
 # LoRa-P2P
 A Python interface for using LoRa Wio-E5 Development Kits for reliable Peer to Peer communication.
 
+## Dependencies
+This package only uses the `pyserial` library. It can be installed here: [The official PySerial docs](https://www.pyserial.org/docs)
+
+## How to use
+This section goes over the steps necessary to use the package and shows an example usage.
+
+### Preparation
+After installing the `pyserial` library you need to find out what the port name is of the port that your LoRa node(s) is/are connected to.
+You can do this as follows:
+```py
+import serial.tools.list_ports
+
+ports = serial.tools.list_ports.comports()
+for port in ports:
+    print(f"{port.device}: {port.description}")
+```
+Now that you know the port, you can start sending messages.
+
+### Example
+```py
+# ====== On a first device ======
+def node1_response_to_message(message: bytes) -> bytes:
+    if message == b"Hello?":
+        return b"Hello!"
+    else:
+        return b"What??"
+
+node1 = LoRaNode(port="COM4") # This is the port that you explored earlier
+reliable_node1 = ReliableCommunicatingNode(node1, node1_response_to_message) # Pass the callback that formulates responses
+
+# ====== On a second device ======
+node2 = LoRaNode(port="COM5") # This is the port that you explored earlier
+reliable_node2 = ReliableCommunicatingNode(node2) # For this example we keep the default handler
+
+message = b"Hello?"
+try:
+    answer = reliable_node1.send_reliably_wait_for_answer(message, max_retries=1, retransmission_timeout=0.5)
+    print(answer)
+except TimeoutError:
+    print("The message did not get a reply in the specified amout of tries")
+# The reply should be b"Hello!" 
+```
+
 ## Class structure
 class dependencies: 
 ```
