@@ -2,7 +2,7 @@ from enum import Enum
 import threading
 from lora_node import LoRaNode
 from queue import Queue
-from received_message_data_handler import ReceivedMessage
+from received_message_data_parser import ReceivedMessage
 from response import Response
 
 class TransmissionState(Enum):

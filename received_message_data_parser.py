@@ -18,7 +18,7 @@ class ReceivedMessage:
     def __str__(self):
         return f"ReceivedMessage(metadata={self.metadata}, payload={self.payload})"
 
-class ReceivedMessageDataHandler:
+class ReceivedMessageDataParser:
     """Handles incoming message data lines. A message consists of 2 lines:
 
         +TEST: LEN:<length>, RSSI:<rssi>, SNR:<snr>

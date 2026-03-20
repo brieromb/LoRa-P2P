@@ -5,7 +5,7 @@ import string
 from pyserial_docs_code.threaded_serial_reader import ThreadedSerialReader
 from pyserial_docs_code.serial_write_with_confirm import write_with_confirm
 
-from received_message_data_handler import ReceivedMessageDataHandler
+from received_message_data_parser import ReceivedMessageDataParser
 
 
 class SerialHelper:
@@ -15,7 +15,7 @@ class SerialHelper:
         self.received_message_handler = received_message_handler
         
         # Set the callback that handles the received messages
-        self.received_message_data_handler = ReceivedMessageDataHandler()
+        self.received_message_data_handler = ReceivedMessageDataParser()
 
         self.threaded_serial_reader = ThreadedSerialReader(
             ser,
