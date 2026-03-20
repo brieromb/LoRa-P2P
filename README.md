@@ -43,6 +43,37 @@ except TimeoutError:
     print("The message did not get a reply in the specified amout of tries")
 # The reply should be b"Hello!" 
 ```
+## What this builds upon
+This is all built upon the P2P functionality of the TEST mode in Wio-E5 Development Kits. These development kits can either listen or send. If they send, they stop listening for received packages until listening is explicitly enabled again. A Normal setup for enabling listening and sending is given here:
+
+### Sending
+```
+> AT //checking the connection
++AT: OK 
+
+>AT+MODE=TEST //enabling test mode
++MODE: TEST
+
+>AT+TEST=TXLRPKT, "01234556789ABCDEF" //sending a hexadecimal packet
++TEST: TXLRPKT "001234556789ABCDEF"
++TEST: TX DONE
+```
+
+### Receiving
+```
+> AT //checking the connection
++AT: OK 
+
+>AT+MODE=TEST //enabling test mode
++MODE: TEST
+
+>AT+TEST=RXLRPKT //enabling listening
++TEST: RXLRPKT
+
+//when message received
++TEST: LEN:9, RSSI:-26, SNR:13
++TEST: RX "001234556789ABCDEF"
+```
 
 ## Class structure
 class dependencies: 
