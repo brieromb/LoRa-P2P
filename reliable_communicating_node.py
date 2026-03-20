@@ -25,7 +25,7 @@ class ReliableCommunicatingNode:
         self.lora_node = lora_node
         self.incoming_message_handler = incoming_message_handler
 
-        self.lora_node.set_on_received_callback(self.on_receive)
+        self.lora_node.set_on_received_callback(self._on_receive)
         
         self.send_queue : Queue = Queue() # Queue of transmissions to be sent reliably
 
@@ -82,7 +82,7 @@ class ReliableCommunicatingNode:
             args=(self._transmit_current,))
         timer_thread.start()
 
-    def on_receive(self, message: ReceivedMessage):
+    def _on_receive(self, message: ReceivedMessage):
         # Process the received message and send an acknowledgement back to the sender
         if message.has_payload():
             payload = message.get_payload()
