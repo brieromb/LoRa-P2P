@@ -2,6 +2,8 @@ from enum import Enum
 import threading
 from lora_node import LoRaNode
 from queue import Queue
+from received_message_data_handler import ReceivedMessage
+from response import Response
 
 class TransmissionState(Enum):
     UNACKNOWLEDGED = 1
@@ -51,11 +53,25 @@ class ReliableCommunicatingNode:
     A reliable communicating node for sending messages over LoRa.
     Uses acknowledgements and retransmissions to ensure message delivery."""
 
-    def __init__(self, lora_node: LoRaNode, max_retries=3):
-        self.lora_node = lora_node
-        self.lora_node.set_on_received_callback(self.on_receive)
+    def __init__(
+            self,
+            lora_node: LoRaNode,
+            max_retries=3,
+            incoming_message_handler = lambda _: b"OK!" # Accepts an incoming ReceivedMessage, and returns OK! as an answer
+    ):
+        """incoming messages to a callback that handles ReceivedMessages.
+        
+        Args:
+            lora_node: An instantiated LoRaNode that this class uses to communicate. This is just a layer above the lora node.
+            max_retries: The maximum number of times that a message is resend when no ACK is retured.
+            incoming_message_handler: A callback that accepts instances of ReceivedMessage, and returns a reply to be sent back. This callback is called whenever a message arrives."""
 
+        self.lora_node = lora_node
         self.max_retries = max_retries
+        self.incoming_message_handler = incoming_message_handler
+
+        self.lora_node.set_on_received_callback(self.on_receive)
+        
         self.send_queue : Queue = Queue() # Queue of transmissions to be sent reliably
 
         self.retransmission_timeout = 5 # Time to wait for an acknowledgement before retransmitting
@@ -93,21 +109,25 @@ class ReliableCommunicatingNode:
         # Process the received message and send an acknowledgement back to the sender
         if message.has_payload():
             payload = message.get_payload()
-            if payload.startswith(b"ACK:"):
-                # Handle the acknowledgement for a sent message
-                acked_message = payload[len(b"ACK:"):]
-                if self.current_transmission and self.current_transmission.send_data == acked_message:
-                    print(f"Acknowledgement received for message: {acked_message}")
+            # Check if the received message is a response to an earlier sent message.
+            payload_as_response = Response.from_bytes(payload)
+            if payload_as_response is not None:
+                # The payload could be interpreted as a response.
+                # Check if the response is for the last sent message.
+                if payload_as_response.is_response_for(self.current_transmission.send_data):
+                    print(f"Received: {str(payload_as_response)}")
                     self.current_transmission.mark_acknowledged()
                     self.current_transmission = None # Clear the current transmission before handling the next one in the queue
                     self._handle_next_in_send_queue()
                 else:
-                    print(f"Received ACK for unknown message: {acked_message}. Expected an ACK for {self.current_transmission.send_data}")
+                    print(f"⚠️ WARNING: received response to an unknown message: {payload_as_response.get_original_message()}. Expected a response for {self.current_transmission.send_data}")
             else:
+                # The received message is not a response to a message that this node sent.
                 # Send an acknowledgement back to the sender for the received message
-                print(f"Received message: {payload}")
-                # Send an acknowledgement back to the sender
-                ack_message = b"ACK:" + payload
-                self.lora_node.send(ack_message)
+                answer: bytes = self.incoming_message_handler(message)
+                # Send a response back to the sender
+                resp = Response(response_for=message, response_contents=answer)
+                # Just send, without expecting a reply to this reply
+                self.lora_node.send(resp.as_bytes())
         else:
-            print(f"Warning: Received message without payload: {message}")
+            print(f"⚠️ WARNING: received message without payload: {message}")

@@ -1,10 +1,10 @@
 class ReceivedMessage:
-    def __init__(self, metadata = {}, payload = None):
+    def __init__(self, metadata = {}, hexpayload = None):
         self.metadata = metadata # Dictionary to hold metadata key-value pairs
         # The actual payload of the message can be set later too.
         self.payload = None
-        if payload is not None:
-            self.set_payload(payload)
+        if hexpayload is not None:
+            self.set_payload(hexpayload)
 
     def set_payload(self, hexpayload: str):
         self.payload = bytes.fromhex(hexpayload)
@@ -12,7 +12,7 @@ class ReceivedMessage:
     def has_payload(self):
         return self.payload is not None
     
-    def get_payload(self):
+    def get_payload(self) -> bytes:
         return self.payload
     
     def __str__(self):
