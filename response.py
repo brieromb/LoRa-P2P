@@ -49,6 +49,9 @@ class Response:
         """Get the message that this response responded to."""
         return self.response_for
     
+    def get_contents(self) -> bytes:
+        return self.response_contents
+    
     def __repr__(self):
         return f"Response({self.response_for},{self.response_contents})"
 

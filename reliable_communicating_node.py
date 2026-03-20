@@ -4,6 +4,7 @@ from queue import Queue
 from received_message_data_parser import ReceivedMessage
 from response import Response
 from transmission import Transmission, TransmissionState
+import time
 
 class ReliableCommunicatingNode:
     """
@@ -63,6 +64,10 @@ class ReliableCommunicatingNode:
         transmission.terminated.wait(timeout=None) # Wait until the transmission is finished successfully or unsuccessfully.
 
         if transmission.state == TransmissionState.FAILED:
+            # First clear the transmission and send the next message in queue before throwing an error.
+            # Else the queue would become blocked.
+            self.current_transmission = None
+            self._handle_next_in_send_queue()
             raise TimeoutError("Connection timed out: The number of max retransmissions was reached, without receiving a reply.")
         else: # The transmission was successful. Return the reply
             return transmission.get_response()
@@ -94,7 +99,7 @@ class ReliableCommunicatingNode:
                 # Check if the response is for the last sent message.
                 if payload_as_response.is_response_for(self.current_transmission.send_data):
                     print(f"Received: {str(payload_as_response)}")
-                    self.current_transmission.mark_acknowledged(payload_as_response)
+                    self.current_transmission.mark_acknowledged(payload_as_response.get_contents())
                     self.current_transmission = None # Clear the current transmission before handling the next one in the queue
                     self._handle_next_in_send_queue()
                 else:
@@ -131,5 +136,6 @@ if __name__ == "__main__":
     answer = reliable_node2.send_reliably_wait_for_answer(b"LOL", 1, 0.5)
     print(f"WAITED FOR AND GOT {answer}")
 
-    reliable_node1.send_reliably("HELLO WORLD".encode("utf-8"))
+    reliable_node1.send_reliably(b"HELLO WORLD")
     print("DID SOME WORK WHILE WAITING")
+    time.sleep(2)
