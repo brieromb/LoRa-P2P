@@ -47,7 +47,8 @@ class ReliableCommunicatingNode:
             print("Currently busy sending another message, adding to send queue")
     
     def send_reliably_wait_for_answer(self, data: bytes, max_retries: int = 3, retransmission_timeout: float = 5.0) -> bytes:
-        """Sends a message using best effort and blocks until a response is received or the max retries are reached."""
+        """Sends a message using best effort and blocks until a response is received or the max retries are reached.
+        If the max retries are reached without any response, a TimeoutException is raised."""
 
         # Create new transmission object and add it to the send queue
         transmission = Transmission(data, max_retries, retransmission_timeout)
