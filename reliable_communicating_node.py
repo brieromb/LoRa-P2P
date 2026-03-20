@@ -1,52 +1,9 @@
-from enum import Enum
 import threading
 from lora_node import LoRaNode
 from queue import Queue
 from received_message_data_parser import ReceivedMessage
 from response import Response
-
-class TransmissionState(Enum):
-    UNACKNOWLEDGED = 1
-    ACKNOWLEDGED = 2
-    FAILED = 3
-
-class Transmission():
-    """
-    Represents a message transmission with its state and retry information."""
-
-    def __init__(self, send_data: bytes, max_retries: int, timeout: float):
-        assert(isinstance(send_data, bytes))
-        self.send_data = send_data
-        self.max_retries = max_retries
-        self.timeout = timeout
-        self.state = TransmissionState.UNACKNOWLEDGED
-
-        self.retries = 0
-        self.acknowledged = threading.Event() # Event to signal that an ACK has been received for this transmission
-
-    def mark_acknowledged(self):
-        self.acknowledged.set()
-        self.state = TransmissionState.ACKNOWLEDGED
-    
-    def retransmission_timer(self, retransmit_callback):
-        """
-        Starts a timer to wait for an acknowledgement. If the timer expires before an ACK is received, it will trigger a retransmission if the max retries has not been reached."""        
-        
-        print("Timer started")
-
-        # Wait until ACK received or timeout
-        if self.acknowledged.wait(self.timeout):
-            print("ACK received -> cancel retransmission")
-            return
-
-        # Timeout occurred. mark as failed if we have reached the max retries.
-        self.retries += 1
-        if (self.retries > self.max_retries):
-            print("Max retries reached -> marking transmission as failed")
-            self.state = TransmissionState.FAILED
-        else:
-            print("Timeout -> retransmitting")
-            retransmit_callback()
+from transmission import Transmission, TransmissionState
 
 class ReliableCommunicatingNode:
     """
@@ -56,7 +13,6 @@ class ReliableCommunicatingNode:
     def __init__(
             self,
             lora_node: LoRaNode,
-            max_retries=3,
             incoming_message_handler = lambda _: b"OK!" # Accepts an incoming ReceivedMessage, and returns OK! as an answer
     ):
         """incoming messages to a callback that handles ReceivedMessages.
@@ -67,20 +23,21 @@ class ReliableCommunicatingNode:
             incoming_message_handler: A callback that accepts instances of ReceivedMessage, and returns a reply to be sent back. This callback is called whenever a message arrives."""
 
         self.lora_node = lora_node
-        self.max_retries = max_retries
         self.incoming_message_handler = incoming_message_handler
 
         self.lora_node.set_on_received_callback(self.on_receive)
         
         self.send_queue : Queue = Queue() # Queue of transmissions to be sent reliably
 
-        self.retransmission_timeout = 5 # Time to wait for an acknowledgement before retransmitting
-
         self.current_transmission : Transmission = None # The transmission that is currently being sent/waiting for ACK
 
-    def send_reliably(self, data):
+    def send_reliably(self, data: bytes, max_retries: int = 3, retransmission_timeout: float = 5.0):
+        """Sends a message using best effort, but non-blocking.
+        If no response is sent within the retransmission timeout,
+        it will retry until the number of max retries is reached."""
+
         # Create new transmission object and add it to the send queue
-        transmission = Transmission(data, self.max_retries, self.retransmission_timeout)
+        transmission = Transmission(data, max_retries, retransmission_timeout)
         self.send_queue.put(transmission)
 
         # If there is no current transmission being sent, start handling the next one in the queue
@@ -88,6 +45,26 @@ class ReliableCommunicatingNode:
             self._handle_next_in_send_queue()
         else:
             print("Currently busy sending another message, adding to send queue")
+    
+    def send_reliably_wait_for_answer(self, data: bytes, max_retries: int = 3, retransmission_timeout: float = 5.0) -> bytes:
+        """Sends a message using best effort and blocks until a response is received or the max retries are reached."""
+
+        # Create new transmission object and add it to the send queue
+        transmission = Transmission(data, max_retries, retransmission_timeout)
+        self.send_queue.put(transmission)
+
+        # If there is no current transmission being sent, start handling the next one in the queue
+        if self.current_transmission is None:
+            self._handle_next_in_send_queue()
+        else:
+            print("Currently busy sending another message, adding to send queue")
+        
+        transmission.terminated.wait(timeout=None) # Wait until the transmission is finished successfully or unsuccessfully.
+
+        if transmission.state == TransmissionState.FAILED:
+            raise TimeoutError("Connection timed out: The number of max retransmissions was reached, without receiving a reply.")
+        else: # The transmission was successful. Return the reply
+            return transmission.get_response()
     
     def _handle_next_in_send_queue(self):
         if not self.send_queue.empty():
@@ -116,7 +93,7 @@ class ReliableCommunicatingNode:
                 # Check if the response is for the last sent message.
                 if payload_as_response.is_response_for(self.current_transmission.send_data):
                     print(f"Received: {str(payload_as_response)}")
-                    self.current_transmission.mark_acknowledged()
+                    self.current_transmission.mark_acknowledged(payload_as_response)
                     self.current_transmission = None # Clear the current transmission before handling the next one in the queue
                     self._handle_next_in_send_queue()
                 else:
@@ -131,3 +108,27 @@ class ReliableCommunicatingNode:
                 self.lora_node.send(resp.as_bytes())
         else:
             print(f"⚠️ WARNING: received message without payload: {message}")
+
+
+if __name__ == "__main__":
+    # Some end-to-end tests for ReliableCommunicatingNode
+    
+    node1 = LoRaNode(port="COM4", baud=9600)
+    reliable_node1 = ReliableCommunicatingNode(node1)
+
+    # The receiving node is not yet initialized, so this should time out.
+    try:
+        reliable_node1.send_reliably_wait_for_answer(b"Should not arrive", 1, 0.5)
+        assert False, "No error was thrown, but the message couldn't have arrived."
+    except TimeoutError:
+        print("Success: the message that couldn't arrive, did not arrive.")
+
+    # Initialize a second node and do some more tests.
+    node2 = LoRaNode(port="COM5", baud=9600)
+    reliable_node2 = ReliableCommunicatingNode(node2)
+
+    answer = reliable_node2.send_reliably_wait_for_answer(b"LOL", 1, 0.5)
+    print(f"WAITED FOR AND GOT {answer}")
+
+    reliable_node1.send_reliably("HELLO WORLD".encode("utf-8"))
+    print("DID SOME WORK WHILE WAITING")

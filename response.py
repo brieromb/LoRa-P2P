@@ -49,8 +49,8 @@ class Response:
         """Get the message that this response responded to."""
         return self.response_for
     
-    def __str__(self):
-        return f"Response for '{self.response_for}' : '{self.response_contents}'"
+    def __repr__(self):
+        return f"Response({self.response_for},{self.response_contents})"
 
 if __name__ == '__main__':
     # Test if a response can be converted into bytes and back.
