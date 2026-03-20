@@ -44,7 +44,9 @@ except TimeoutError:
 # The reply should be b"Hello!" 
 ```
 ## What this builds upon
-This is all built upon the P2P functionality of the TEST mode in Wio-E5 Development Kits. These development kits can either listen or send. If they send, they stop listening for received packages until listening is explicitly enabled again. A Normal setup for enabling listening and sending is given here:
+This is all built upon the P2P functionality of the TEST mode in Wio-E5 Development Kits. These development kits can either listen or send. If they send, they stop listening for received packages until listening is explicitly enabled again. More information about these modules in TEST mode can be found in the [official documentation for Wio-E5 Development Kits](https://files.seeedstudio.com/products/317990687/res/LoRa-E5%20AT%20Command%20Specification_V1.0%20.pdf)
+
+A Normal setup for enabling listening and sending is given here:
 
 ### Sending
 ```
