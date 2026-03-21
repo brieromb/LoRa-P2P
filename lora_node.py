@@ -1,11 +1,10 @@
-from typing import override
-
 import serial
-from either_listen_or_send_node_interface import EitherListenOrSendNodeInterface
+
 from lora_kit_controller import LoRaKitController
 from mock_lora_kit_controller import MockLoRaKitController
+from received_message_data_parser import ReceivedMessage
 
-class LoRaNode(EitherListenOrSendNodeInterface):
+class LoRaNode:
     """A high level communicating node that uses a LoRaKitController to take care of switching modes and setting up the hardware.
     Can send messages to other nodes and also handles incoming ReceivedMessages from other nodes."""
 
@@ -30,21 +29,27 @@ class LoRaNode(EitherListenOrSendNodeInterface):
         self.lora_controller.enable_test_mode()
         self.lora_controller.enable_listening()
 
-    @override
-    def _send_while_not_listening(self, data: bytes):
-        self.lora_controller.send_message(data)
+    def set_on_received_callback(self, callback) -> None:
+        self.on_received_callback = callback
 
-    @override
-    def _enable_listening(self):
-        self.lora_controller.enable_listening()
-    
-    @override
-    def _stop_listening(self):
-        # The LoRa module automatically stops listening when a message is sent.
-        # So we don't need to do anything here
-        pass
+    def send(self, data: bytes):
+        """Sends a message, which disables listening.
+        Resumes listening after finishing sending"""
 
-    @override
+        self.lora_controller.send_message(data) # Send the message, which disables listening.
+        self.lora_controller.enable_listening() # Resume listening after sending
+
+    def receive(self, message: ReceivedMessage):
+        """Handles receiving a message. This should only be called when the node is in listening mode."""
+        # Implement receiving logic here
+        if not self.is_listening():
+            print("Cannot receive while not listening.")
+            return
+        if self.on_received_callback:
+            self.on_received_callback(message)
+        else:
+            print("Received a message, but no callback is set.")
+
     def is_listening(self):
         return self.lora_controller.is_listening()
 
