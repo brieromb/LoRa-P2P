@@ -119,7 +119,7 @@ class ReliableCommunicatingNode:
 if __name__ == "__main__":
     # Some end-to-end tests for ReliableCommunicatingNode
     
-    node1 = LoRaNode(port="COM4", baud=9600)
+    node1 = LoRaNode(port="COM4")
     reliable_node1 = ReliableCommunicatingNode(node1)
 
     # The receiving node is not yet initialized, so this should time out.
@@ -130,7 +130,7 @@ if __name__ == "__main__":
         print("Success: the message that couldn't arrive, did not arrive.")
 
     # Initialize a second node and do some more tests.
-    node2 = LoRaNode(port="COM5", baud=9600)
+    node2 = LoRaNode(port="COM5")
     reliable_node2 = ReliableCommunicatingNode(node2)
 
     answer = reliable_node2.send_reliably_wait_for_answer(b"LOL", 1, 0.5)
