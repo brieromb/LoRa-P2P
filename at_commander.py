@@ -8,7 +8,10 @@ from pyserial_docs_code.serial_write_with_confirm import write_with_confirm
 from received_message_data_parser import ReceivedMessageDataParser
 
 
-class SerialHelper:
+class ATCommander:
+    """Class that provides a high level interface for sending AT commands to a LoRa module
+    over a serial connection, using pyserial."""
+
     def __init__(self, ser: serial.Serial, received_message_handler=lambda x: print(x)):
 
         self.ser = ser
@@ -78,7 +81,7 @@ class SerialHelper:
 
 if __name__ == '__main__':
     ser = serial.Serial('COM4')
-    helper = SerialHelper(ser)
+    helper = ATCommander(ser)
 
     print(f"Connection OK: {helper.check_connection()}")
     print(f"Test mode OK: {helper.enable_test_mode()}")
@@ -87,7 +90,7 @@ if __name__ == '__main__':
 
 
     ser2 = serial.Serial('COM5')
-    helper2 = SerialHelper(ser2)
+    helper2 = ATCommander(ser2)
 
     print(f"Connection OK: {helper2.check_connection()}")
     print(f"Test mode OK: {helper2.enable_test_mode()}")

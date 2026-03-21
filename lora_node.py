@@ -2,7 +2,7 @@ from typing import override
 
 import serial
 from either_listen_or_send_node_interface import EitherListenOrSendNodeInterface
-from serial_helper import SerialHelper
+from at_commander import ATCommander
 
 class LoRaNode(EitherListenOrSendNodeInterface):
 
@@ -12,7 +12,7 @@ class LoRaNode(EitherListenOrSendNodeInterface):
         ser = serial.Serial(port, baud, timeout=1)
 
         # Set the received message handler to the receive function of this class
-        self.serial_helper = SerialHelper(ser, received_message_handler=self.receive)
+        self.serial_helper = ATCommander(ser, received_message_handler=self.receive)
 
         # Setting up the LoRa module
         # Test connection and set to test mode
