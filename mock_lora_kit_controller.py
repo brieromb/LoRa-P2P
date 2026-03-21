@@ -1,7 +1,7 @@
 import threading
 from typing import override
 
-from at_commander import ATCommander
+from lora_kit_controller import LoRaKitController
 from received_message_data_parser import ReceivedMessage
 import time
 
@@ -10,16 +10,16 @@ class MockMedium:
 
     def __init__(self):
         # TODO: add options to add artificial delay and other parameters.
-        self.lora_controllers: list[MockATCommander] = []
+        self.lora_controllers: list[MockLoRaKitController] = []
 
     def join(self, lora_controller):
-        """Function to let a MockATCommander join the medium.
-        This allows it to receive messages from other MockATCommanders."""
+        """Function to let a MockLoRaKitController join the medium.
+        This allows it to receive messages from other MockLoRaKitController."""
 
         self.lora_controllers.append(lora_controller)
     
     def broadcast(self, source, payload: bytes):
-        """Broadcast a message payload from a MockATCommander to the others on the medium."""
+        """Broadcast a message payload from a MockLoRaKitController to the others on the medium."""
         # The received hex payload for the real LoRa modules is always in upper case, and if uneven, starts with a zero.
         hex_payload = payload.hex().upper()
         packet_length = len(hex_payload)
@@ -46,7 +46,7 @@ class MockMedium:
             messenger_thread.start()
     
     def deliver_message(self, lora_controller, message_to_be_received: ReceivedMessage):
-        """Delivers a message to a receiving callback of an ATCommander after a small delay.
+        """Delivers a message to a receiving callback of an LoRaKitController after a small delay.
         Is supposed to be executed in a separate thread."""
         # Add a small transmission delay
         time.sleep(0.05)
@@ -56,11 +56,11 @@ class MockMedium:
             raise RuntimeError("The receiving mocked lora controller was not listening while another node tried to deliver a message")
 
 
-class MockATCommander(ATCommander):
-    """Class that mocks the behaviour of the ATCommander class controlling a LoRa module.
+class MockLoRaKitController(LoRaKitController):
+    """Class that mocks the behaviour of the LoRaKitController class which controls a LoRa module.
     This can be used for testing purposes without needing to have an actual LoRa module connected via a serial connection."""
 
-    # Medium as a static variable, shared by all MockATCommander instances.
+    # Medium as a static variable, shared by all LoRaKitController instances.
     medium = MockMedium()
 
     def __init__(self, received_message_handler=lambda x: print(x)):
@@ -113,15 +113,15 @@ class MockATCommander(ATCommander):
         return self.listening
 
 if __name__ == '__main__':
-    at_commander1 = MockATCommander()
-    at_commander1.check_connection()
-    at_commander1.enable_test_mode()
-    at_commander1.enable_listening()
+    lora_controller = MockLoRaKitController()
+    lora_controller.check_connection()
+    lora_controller.enable_test_mode()
+    lora_controller.enable_listening()
 
-    at_commander2 = MockATCommander()
-    at_commander2.check_connection()
-    at_commander2.enable_test_mode()
-    at_commander2.send_message(b"HELLO WORLD")
+    lora_controller2 = MockLoRaKitController()
+    lora_controller2.check_connection()
+    lora_controller2.enable_test_mode()
+    lora_controller2.send_message(b"HELLO WORLD")
     print("Did some work before other received my message")
 
 
