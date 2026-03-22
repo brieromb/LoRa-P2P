@@ -10,7 +10,7 @@ authors = [
 ]
 description = "An interface for reliably sending data peer-to-peer using LoRa Wio-E5 Development Kits"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.14"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
