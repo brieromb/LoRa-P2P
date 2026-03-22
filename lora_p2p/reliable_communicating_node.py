@@ -1,10 +1,11 @@
 import threading
-from lora_node import LoRaNode
-from queue import Queue
-from receiving.received_message_data_parser import ReceivedMessage
-from receiving.response import Response
-from transmission import Transmission, TransmissionState
 import time
+from queue import Queue
+
+from .lora_node import LoRaNode
+from .receiving.received_message_data_parser import ReceivedMessage
+from .receiving.response import Response
+from .transmission import Transmission, TransmissionState
 
 class ReliableCommunicatingNode:
     """
@@ -116,7 +117,7 @@ class ReliableCommunicatingNode:
             print(f"⚠️ WARNING: received message without payload: {message}")
 
 
-if __name__ == "__main__":
+def testReliableCommunicatingNode():
     # Some end-to-end tests for ReliableCommunicatingNode
     
     node1 = LoRaNode(port="COM4")

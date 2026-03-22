@@ -1,4 +1,4 @@
-from receiving.received_message import ReceivedMessage
+from .received_message import ReceivedMessage
 
 class ReceivedMessageDataParser:
     """Handles incoming message data lines. A message consists of 2 lines:
