@@ -1,4 +1,7 @@
-states.png
+*.png
+TODO
+/dist/*
 /__pycache__/*
 */__pycache__/*
-TODO
+*/*/__pycache__/*
+*/*/*/__pycache__/*

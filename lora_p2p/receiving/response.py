@@ -1,6 +1,6 @@
 import pickle
 
-from received_message_data_parser import ReceivedMessage
+from receiving.received_message_data_parser import ReceivedMessage
 
 class Response:
     """A response is a class that represents a message response to a previously sent message.

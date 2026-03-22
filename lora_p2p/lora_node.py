@@ -1,8 +1,8 @@
 import serial
 
-from lora_kit_controller import LoRaKitController
-from mock_lora_kit_controller import MockLoRaKitController
-from received_message_data_parser import ReceivedMessage
+from lora_kit.lora_kit_controller import LoRaKitController
+from lora_kit.mock_lora_kit_controller import MockLoRaKitController
+from receiving.received_message_data_parser import ReceivedMessage
 
 class LoRaNode:
     """A high level communicating node that uses a LoRaKitController to take care of switching modes and setting up the hardware.
