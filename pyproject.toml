@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lora_p2p"
+version = "0.0.1"
+authors = [
+  { name="Briek Rombaut", email="briek.rombaut@protonmail.com" },
+]
+description = "An interface for reliably sending data peer-to-peer using LoRa Wio-E5 Development Kits"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+dependencies = [
+    "pyserial>=3.5"
+]
+
+[project.urls]
+Homepage = "https://github.com/brieromb/LoRa-P2P/"
+Issues = "https://github.com/brieromb/LoRa-P2P/issues"
