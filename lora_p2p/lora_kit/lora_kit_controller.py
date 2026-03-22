@@ -2,10 +2,10 @@ import time
 
 import serial
 import string
-from pyserial_docs_code.threaded_serial_reader import ThreadedSerialReader
-from pyserial_docs_code.serial_write_with_confirm import write_with_confirm
+from lora_kit.serial_helper_code.threaded_serial_reader import ThreadedSerialReader
+from lora_kit.serial_helper_code.serial_write_with_confirm import write_with_confirm
 
-from received_message_data_parser import ReceivedMessageDataParser
+from receiving.received_message_data_parser import ReceivedMessageDataParser
 
 
 class LoRaKitController:

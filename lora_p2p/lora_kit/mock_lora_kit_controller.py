@@ -1,8 +1,8 @@
 import threading
 from typing import override
 
-from lora_kit_controller import LoRaKitController
-from received_message_data_parser import ReceivedMessage
+from lora_kit.lora_kit_controller import LoRaKitController
+from receiving.received_message_data_parser import ReceivedMessage
 import time
 
 class MockMedium:
