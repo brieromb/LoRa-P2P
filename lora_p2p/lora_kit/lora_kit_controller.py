@@ -14,6 +14,7 @@ def _bool_to_on_off_string(bool_value) -> str:
     else:
         return "OFF"
 
+@dataclass
 class CommunicationParameters:
     """The communication parameters used to let lora hardware communicate.
     The settings need to be the same on both ends.
@@ -25,26 +26,17 @@ class CommunicationParameters:
     
     For the other parameter descriptions, consult the LoRa Wio E5 developer kit documentation or the LoRa standard documentation.
     """
-    def __init__(self,
-                 frequency = 868,
-                 spread_factor = 7,
-                 bandwidth = 125,
-                 tx_preamble_length = 8,
-                 rx_preamble_length = 8,
-                 tx_power = 14,
-                 crc = True,
-                 inverted_iq = False,
-                 public_lora_wan = False
-    ):  
-        self.frequency=frequency
-        self.spread_factor=spread_factor
-        self.bandwidth=bandwidth
-        self.tx_preamble_length=tx_preamble_length
-        self.rx_preamble_length=rx_preamble_length
-        self.tx_power=tx_power
-        self.crc=crc
-        self.inverted_iq=inverted_iq
-        self.public_lora_wan=public_lora_wan
+
+    frequency : int = 868
+    spread_factor : int = 7
+    bandwidth : int = 125
+    tx_preamble_length : int = 8
+    rx_preamble_length : int = 8
+    tx_power : int = 14
+    crc : bool = True
+    inverted_iq : bool = False
+    public_lora_wan : bool = False
+
 
 class LoRaKitController:
     """Class that provides a high level interface for sending AT commands to a LoRa module
