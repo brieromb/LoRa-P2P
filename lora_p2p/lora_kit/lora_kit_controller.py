@@ -19,14 +19,14 @@ class CommunicationParameters:
     The settings need to be the same on both ends.
     
     Params:
-        frequency: in Hz.
+        frequency: in MHz.
         spread_factor: LoRa supports a spread factor of 7 to 12.
         bandwidth: In KHz. Only 125KHz / 250KHz / 500KHz are supported by the hardware.
     
     For the other parameter descriptions, consult the LoRa Wio E5 developer kit documentation or the LoRa standard documentation.
     """
     def __init__(self,
-                 frequency = 868000000,
+                 frequency = 868,
                  spread_factor = 7,
                  bandwidth = 125,
                  tx_preamble_length = 8,
@@ -36,14 +36,14 @@ class CommunicationParameters:
                  inverted_iq = False,
                  public_lora_wan = False
     ):  
-        self.frequency=frequency,
-        self.spread_factor=spread_factor,
-        self.bandwidth=bandwidth,
-        self.tx_preamble_length=tx_preamble_length,
-        self.rx_preamble_length=rx_preamble_length,
-        self.tx_power=tx_power,
-        self.crc=crc,
-        self.inverted_iq=inverted_iq,
+        self.frequency=frequency
+        self.spread_factor=spread_factor
+        self.bandwidth=bandwidth
+        self.tx_preamble_length=tx_preamble_length
+        self.rx_preamble_length=rx_preamble_length
+        self.tx_power=tx_power
+        self.crc=crc
+        self.inverted_iq=inverted_iq
         self.public_lora_wan=public_lora_wan
 
 class LoRaKitController:
@@ -86,8 +86,9 @@ class LoRaKitController:
         # Construct the AT command
         command = f"AT+TEST=RFCFG, {params.frequency}, SF{params.spread_factor}, {params.bandwidth}, {params.tx_preamble_length}, {params.rx_preamble_length}, {params.tx_power}, {crc_on_off}, {inverted_iq_on_off}, {public_lora_wan_on_off}\r\n"
 
+        response_freq = str(params.frequency) + "000000" # Freq is in Hz in the response for some reason.
         # Construct the expected response
-        expected_response = f"+TEST: RFCFG F:{params.frequency}, SF{params.spread_factor}, BW{params.bandwidth}K, TXPR:{params.tx_preamble_length}, RXPR:{params.rx_preamble_length}, POW:{params.tx_power}dBm, CRC:{crc_on_off}, IQ:{inverted_iq_on_off}, NET:{public_lora_wan_on_off}\r\n"
+        expected_response = f"+TEST: RFCFG F:{response_freq}, SF{params.spread_factor}, BW{params.bandwidth}K, TXPR:{params.tx_preamble_length}, RXPR:{params.rx_preamble_length}, POW:{params.tx_power}dBm, CRC:{crc_on_off}, IQ:{inverted_iq_on_off}, NET:{public_lora_wan_on_off}"
 
         return self._write_command_and_check_response(command.encode(), expected_response.encode())
 
