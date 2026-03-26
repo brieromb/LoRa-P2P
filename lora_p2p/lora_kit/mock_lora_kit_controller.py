@@ -2,7 +2,7 @@ import threading
 from typing import override
 import time
 
-from .lora_kit_controller import LoRaKitController
+from .lora_kit_controller import LoRaKitController, CommunicationParameters
 from ..receiving.received_message_data_parser import ReceivedMessage
 
 class MockMedium:
@@ -76,6 +76,13 @@ class MockLoRaKitController(LoRaKitController):
     @override
     def enable_test_mode(self) -> bool:
         self.test_mode_enabled = True
+
+    @override
+    def set_communication_parameters(self, params: CommunicationParameters) -> bool:
+    
+        """The effect of setting the communication parameters isn't mocked.
+        Mocked nodes can always communicate with each other, no matter what is configured here."""
+        return True
 
     @override
     def enable_listening(self) -> bool:

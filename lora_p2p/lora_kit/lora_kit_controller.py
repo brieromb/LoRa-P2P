@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import time
 
 import serial
@@ -7,6 +8,43 @@ from .serial_helper_code.serial_write_with_confirm import write_with_confirm
 
 from ..receiving.received_message_data_parser import ReceivedMessageDataParser
 
+def _bool_to_on_off_string(bool_value) -> str:
+    if bool_value:
+        return "ON"
+    else:
+        return "OFF"
+
+class CommunicationParameters:
+    """The communication parameters used to let lora hardware communicate.
+    The settings need to be the same on both ends.
+    
+    Params:
+        frequency: in Hz.
+        spread_factor: LoRa supports a spread factor of 7 to 12.
+        bandwidth: In KHz. Only 125KHz / 250KHz / 500KHz are supported by the hardware.
+    
+    For the other parameter descriptions, consult the LoRa Wio E5 developer kit documentation or the LoRa standard documentation.
+    """
+    def __init__(self,
+                 frequency = 868000000,
+                 spread_factor = 7,
+                 bandwidth = 125,
+                 tx_preamble_length = 8,
+                 rx_preamble_length = 8,
+                 tx_power = 14,
+                 crc = True,
+                 inverted_iq = False,
+                 public_lora_wan = False
+    ):  
+        self.frequency=frequency,
+        self.spread_factor=spread_factor,
+        self.bandwidth=bandwidth,
+        self.tx_preamble_length=tx_preamble_length,
+        self.rx_preamble_length=rx_preamble_length,
+        self.tx_power=tx_power,
+        self.crc=crc,
+        self.inverted_iq=inverted_iq,
+        self.public_lora_wan=public_lora_wan
 
 class LoRaKitController:
     """Class that provides a high level interface for sending AT commands to a LoRa module
@@ -28,6 +66,31 @@ class LoRaKitController:
 
     def check_connection(self) -> bool:
         return self._write_command_and_check_response(b'AT\r\n', b'+AT: OK')
+    
+    def set_communication_parameters(self, params: CommunicationParameters) -> bool:
+    
+        """Set the connection parameters. Connection parameters should be the same for two nodes to enable them to communicate.
+        Based on this command: AT+TEST=RFCFG,[FREQUENCY],[SF],[BANDWIDTH],[TX PR],[RX PR],[TX POWER],[CRC],[IQ],[NET]
+        The default parameters chosen here are for the EU868 MHz band.
+
+        Args:
+            frequency: in Hz.
+            spread_factor: LoRa supports a spread factor of 7 to 12.
+            bandwidth: In KHz. Only 125KHz / 250KHz / 500KHz are supported by the hardware.
+        """
+
+        crc_on_off = _bool_to_on_off_string(params.crc)
+        inverted_iq_on_off = _bool_to_on_off_string(params.inverted_iq)
+        public_lora_wan_on_off = _bool_to_on_off_string(params.public_lora_wan)
+
+        # Construct the AT command
+        command = f"AT+TEST=RFCFG, {params.frequency}, SF{params.spread_factor}, {params.bandwidth}, {params.tx_preamble_length}, {params.rx_preamble_length}, {params.tx_power}, {crc_on_off}, {inverted_iq_on_off}, {public_lora_wan_on_off}\r\n"
+
+        # Construct the expected response
+        expected_response = f"+TEST: RFCFG F:{params.frequency}, SF{params.spread_factor}, BW{params.bandwidth}K, TXPR:{params.tx_preamble_length}, RXPR:{params.rx_preamble_length}, POW:{params.tx_power}dBm, CRC:{crc_on_off}, IQ:{inverted_iq_on_off}, NET:{public_lora_wan_on_off}\r\n"
+
+        return self._write_command_and_check_response(command.encode(), expected_response.encode())
+
     
     def enable_test_mode(self) -> bool:
         return self._write_command_and_check_response(b'AT+MODE=TEST\r\n', b'+MODE: TEST')
