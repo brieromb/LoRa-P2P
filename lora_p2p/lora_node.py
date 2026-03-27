@@ -1,6 +1,6 @@
 import serial
 
-from .lora_kit.lora_kit_controller import LoRaKitController
+from .lora_kit.lora_kit_controller import LoRaKitController, CommunicationParameters
 from .lora_kit.mock_lora_kit_controller import MockLoRaKitController
 from .receiving.received_message_data_parser import ReceivedMessage
 
@@ -8,12 +8,16 @@ class LoRaNode:
     """A high level communicating node that uses a LoRaKitController to take care of switching modes and setting up the hardware.
     Can send messages to other nodes and also handles incoming ReceivedMessages from other nodes."""
 
-    def __init__(self, port: None | str = None):
+    def __init__(self,
+                 port: None | str = None,
+                 communication_params: CommunicationParameters = CommunicationParameters()
+                 ):
         """Creates an instance of a LoRaNode.
         
         Args:
             port: the name of the physical port that the LoRa Wio-E5 Development Kit is connected to.
-                If this is None, a mock version of a LoRa node is created that doesn't use real hardware."""
+                If this is None, a mock version of a LoRa node is created that doesn't use real hardware.
+            communication_params: The parameters this node will be configured with. The default parameters of the LoRa module are the default connection parameters."""
 
         if port is None:
             # Create a mocked version of the LoRaKitController. This works without real hardware.
@@ -27,6 +31,7 @@ class LoRaNode:
         # Test connection and set to test mode
         self.lora_controller.check_connection()
         self.lora_controller.enable_test_mode()
+        self.lora_controller.set_communication_parameters(communication_params)
         self.lora_controller.enable_listening()
 
     def set_on_received_callback(self, callback) -> None:
