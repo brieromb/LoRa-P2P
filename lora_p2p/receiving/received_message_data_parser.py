@@ -1,4 +1,4 @@
-from .received_message import ReceivedMessage
+from .received_message import ReceivedMessage, ConnectionQualityMeasurements
 
 class ReceivedMessageDataParser:
     """Handles incoming message data lines. A message consists of 2 lines:
@@ -15,14 +15,17 @@ class ReceivedMessageDataParser:
     def __init__(self):
         self.message_getting_processed = None
 
-    def process_message_line(self, message_line) -> None | ReceivedMessage:
+    def process_message_line(self, message_line) -> ReceivedMessage | None:
         if self.message_getting_processed is None:
             # No message is already getting processed. So this line must be message metadata.
             metadata = self._parse_metadata(message_line)
             if not metadata:
                 return
+            # Add the metadata to the newly received message.
+            conn_qual_measurements = ConnectionQualityMeasurements(metadata["RSSI"], metadata["SNR"])
+            message_length = metadata["LEN"]
+            self.message_getting_processed = ReceivedMessage(message_length, conn_qual_measurements)
             # A new message is getting processed. Wait for the payload before returning it.
-            self.message_getting_processed = ReceivedMessage(metadata)
             return
         else:
             # A message with metadata was already processed. So this must be the payload.
@@ -36,7 +39,7 @@ class ReceivedMessageDataParser:
             return finished_message
             
     
-    def _parse_metadata(self, metadata_line):
+    def _parse_metadata(self, metadata_line) -> dict | None:
         """Handles a message line like:
         
         +TEST: LEN:<length>, RSSI:<rssi>, SNR:<snr>

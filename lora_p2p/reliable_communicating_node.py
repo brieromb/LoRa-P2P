@@ -2,9 +2,12 @@ import threading
 import time
 from queue import Queue
 
+from .receiving.received_message import ConnectionQualityMeasurements
+from .receiving.received_response import ReceivedResponse
+
 from .lora_node import LoRaNode
 from .receiving.received_message_data_parser import ReceivedMessage
-from .receiving.response import Response
+from .receiving.response import ResponsePayload
 from .transmission import Transmission, TransmissionState
 
 class ReliableCommunicatingNode:
@@ -22,7 +25,7 @@ class ReliableCommunicatingNode:
         Args:
             lora_node: An instantiated LoRaNode that this class uses to communicate. This is just a layer above the lora node.
             max_retries: The maximum number of times that a message is resend when no ACK is retured.
-            incoming_message_handler: A callback that accepts instances of ReceivedMessage, and returns a reply to be sent back. This callback is called whenever a message arrives."""
+            incoming_message_handler: A callback that handles a tuple like (received_message (bytes), ConnectionQualityMeasurements), and formulates a reply (in bytes) to be sent back. This callback is called whenever a message arrives."""
 
         self.lora_node = lora_node
         self.incoming_message_handler = incoming_message_handler
@@ -48,9 +51,10 @@ class ReliableCommunicatingNode:
         else:
             print("Currently busy sending another message, adding to send queue")
     
-    def send_reliably_wait_for_answer(self, data: bytes, max_retries: int = 3, retransmission_timeout: float = 5.0) -> bytes:
+    def send_reliably_wait_for_answer(self, data: bytes, max_retries: int = 3, retransmission_timeout: float = 5.0) -> tuple[bytes, ConnectionQualityMeasurements]:
         """Sends a message using best effort and blocks until a response is received or the max retries are reached.
-        If the max retries are reached without any response, a TimeoutException is raised."""
+        The response that is returned is a tuple containing the response bytes and the connection quality measurements.
+        If the max retries are reached without getting any response, a TimeoutException is raised."""
 
         # Create new transmission object and add it to the send queue
         transmission = Transmission(data, max_retries, retransmission_timeout)
@@ -71,7 +75,7 @@ class ReliableCommunicatingNode:
             self._handle_next_in_send_queue()
             raise TimeoutError("Connection timed out: The number of max retransmissions was reached, without receiving a reply.")
         else: # The transmission was successful. Return the reply
-            return transmission.get_response()
+            return transmission.get_response().as_tuple()
     
     def _handle_next_in_send_queue(self):
         if not self.send_queue.empty():
@@ -90,30 +94,30 @@ class ReliableCommunicatingNode:
         timer_thread.start()
 
     def _on_receive(self, message: ReceivedMessage):
+        """Processes received messages.
+        Checks if they are responses to a previously sent message or if they are new messages.
+        In the latter case the function will respond back using the incoming_message_handler.
+        Also prints appropriate warnings when unexpected cases occur."""
+
         # Process the received message and send an acknowledgement back to the sender
         if message.has_payload():
-            payload = message.get_payload()
-            # Check if the received message is a response to an earlier sent message.
-            payload_as_response = Response.from_bytes(payload)
-            if payload_as_response is not None:
-                # The payload could be interpreted as a response.
-                # Check if the response is for the last sent message.
-                if payload_as_response.is_response_for(self.current_transmission.send_data):
-                    print(f"Received: {str(payload_as_response)}")
-                    self.current_transmission.mark_acknowledged(payload_as_response.get_contents())
+            try: # Try to interpret the received message as a received response.
+                response = ReceivedResponse(message)
+                if response.finishes_transmission(self.current_transmission):
+                    self.current_transmission.mark_acknowledged(response)
                     self.current_transmission = None # Clear the current transmission before handling the next one in the queue
                     self._handle_next_in_send_queue()
                 else:
-                    print(f"⚠️ WARNING: received response to an unknown message: {payload_as_response.get_original_message()}. Expected a response for {self.current_transmission.send_data}")
-            else:
-                # The received message is not a response to a message that this node sent.
-                # Send an acknowledgement back to the sender for the received message
-                answer: bytes = self.incoming_message_handler(message)
+                    print(f"⚠️ WARNING: received response to an unknown message: {response.get_original_message_payload()}. Expected a response for {self.current_transmission.get_send_data()}")
+
+            except ValueError: # The message could not be interpreted as a response.
+                # So it must be an original new message that needs a response from this node.
+                answer: bytes = self.incoming_message_handler(message.as_tuple())
                 # Send a response back to the sender
-                resp = Response(response_for=message, response_contents=answer)
+                resp = ResponsePayload(response_for=message, response_contents=answer)
                 # Just send, without expecting a reply to this reply
                 self.lora_node.send(resp.as_bytes())
-        else:
+        else: 
             print(f"⚠️ WARNING: received message without payload: {message}")
 
 

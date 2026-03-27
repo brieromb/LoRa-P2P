@@ -2,9 +2,14 @@ import pickle
 
 from .received_message_data_parser import ReceivedMessage
 
-class Response:
-    """A response is a class that represents a message response to a previously sent message.
-    A Response instance is sent over the medium, encoded as bytes."""
+class ResponsePayload:
+    """Represents a response payload to a previously sent message.
+    A response is sent over the medium as a dict like:
+    
+    {response_for: <bytes>, response_contents: <bytes>} (but encoded as bytes)
+
+    And when a message is received, it is decoded and checked if it is of the format expected from a response payload. 
+    """
 
     def __init__(self, response_for: bytes | ReceivedMessage, response_contents: bytes):
         assert isinstance(response_for, bytes) or isinstance(response_for, ReceivedMessage), "response_for should be either bytes or a ReceivedMessage instance"
@@ -24,7 +29,7 @@ class Response:
                 response_for_field = dict_instance.get('response_for')
                 response_contents_field = dict_instance.get('response_contents')
                 if len(dict_instance) == 2 and response_for_field is not None and response_contents_field is not None:
-                    return Response(
+                    return ResponsePayload(
                         response_for=response_for_field,
                         response_contents=response_contents_field
                     )
@@ -51,29 +56,27 @@ class Response:
     
     def get_contents(self) -> bytes:
         return self.response_contents
-    
-    def __repr__(self):
-        return f"Response({self.response_for},{self.response_contents})"
+
 
 if __name__ == '__main__':
     # Test if a response can be converted into bytes and back.
     message_payload = b'HELLO WORLD'
     response_payload = b'HELLO'
 
-    response = Response(message_payload, response_payload)
+    response = ResponsePayload(message_payload, response_payload)
     bytes_response = response.as_bytes()
 
-    response2 = Response.from_bytes(bytes_response)
+    response2 = ResponsePayload.from_bytes(bytes_response)
 
     assert response2.is_response_for(message_payload)
     print("Success")
 
     # Test if a Response can be created from a ReceivedMessage.
     message = ReceivedMessage({}, message_payload.hex())
-    response = Response(message, response_payload)
+    response = ResponsePayload(message, response_payload)
     assert response.is_response_for(message.get_payload())
     print("Success")
 
-    assert Response.from_bytes(message_payload) is None
+    assert ResponsePayload.from_bytes(message_payload) is None
     print("Success")
 
