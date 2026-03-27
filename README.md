@@ -24,26 +24,36 @@ If you do not have the LoRa kit connected to your PC at the moment, you can stil
 ### Example
 ```py
 # ====== On a first device ======
-def node1_response_to_message(message: bytes) -> bytes:
-    if message == b"Hello?":
-        return b"Hello!"
+
+from lora_p2p import *
+
+# Define a custom callback to handle incoming messages
+def node1_response_to_message(message_data: tuple[bytes, ConnectionQualityMeasurements]) -> bytes:
+    message = message_data[0]
+    if message == b"Hello":
+        return b"World"
     else:
         return b"What??"
 
 node1 = LoRaNode(port="COM4") # This is the port that you explored earlier
 reliable_node1 = ReliableCommunicatingNode(node1, node1_response_to_message) # Pass the callback that formulates responses
-
+```
+```py
 # ====== On a second device ======
+
+from lora_p2p import *
+
 node2 = LoRaNode(port="COM5") # This is the port that you explored earlier
 reliable_node2 = ReliableCommunicatingNode(node2) # For this example we keep the default handler
 
-message = b"Hello?"
+message = b"Hello"
 try:
-    answer = reliable_node1.send_reliably_wait_for_answer(message, max_retries=1, retransmission_timeout=0.5)
+    answer_data = reliable_node2.send_reliably_wait_for_answer(message, max_retries=1, retransmission_timeout=0.5)
+    answer = answer_data[0]
     print(answer)
 except TimeoutError:
     print("The message did not get a reply in the specified amout of tries")
-# The reply should be b"Hello!" 
+# The reply should be b'World'
 ```
 ## What this builds upon
 This is all built upon the P2P functionality of the TEST mode in Wio-E5 Development Kits. These development kits can either listen or send. If they send, they stop listening for received packages until listening is explicitly enabled again. More information about these modules in TEST mode can be found in the [official documentation for Wio-E5 Development Kits](https://files.seeedstudio.com/products/317990687/res/LoRa-E5%20AT%20Command%20Specification_V1.0%20.pdf)
