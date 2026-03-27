@@ -22,19 +22,25 @@ class Transmission():
         self.timeout = timeout
 
         self.state = TransmissionState.UNACKNOWLEDGED
-        self.response_payload = None
+        self.response = None
 
         self.retries = 0
         self.terminated = threading.Event() # Event that signals that the transmission is finished. Either response received or reached max retries.
 
-    def mark_acknowledged(self, response_payload: bytes):
+    def mark_acknowledged(self, response):
+        """Mark the current transmission as acknowledged,
+        by providing the ReceivedResponse instance that replies to the sent data."""
+
         self.state = TransmissionState.ACKNOWLEDGED
-        self.response_payload = response_payload
+        self.response = response
         self.terminated.set()
     
     def get_response(self):
-        assert self.response_payload is not None, "tried to access a response to a transmission that hasn't arrived (yet)"
-        return self.response_payload
+        assert self.response is not None, "tried to access a response to a transmission that hasn't arrived (yet)"
+        return self.response
+    
+    def get_send_data(self) -> bytes:
+        return self.send_data
 
     def _mark_unsuccessful(self):
         self.state = TransmissionState.FAILED
