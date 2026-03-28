@@ -36,11 +36,11 @@ class ReceivedResponse(ReceivedMessage):
     
         return self.payload.is_response_for(transmission.get_send_data())
     
-    def get_original_message_payload(self):
-        return self.payload.get_original_message()
+    def get_original_message_digest(self):
+        return self.payload.get_original_message_digest()
     
     def __str__(self):
-        return f"{self.payload.get_original_message()} <- " + super().__str__()
+        return f"{self.payload.get_original_message_digest()} <- " + super().__str__()
 
 
 

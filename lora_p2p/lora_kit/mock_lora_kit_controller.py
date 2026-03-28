@@ -4,6 +4,7 @@ import time
 
 from .lora_kit_controller import LoRaKitController, CommunicationParameters
 from ..receiving.received_message_data_parser import ReceivedMessage
+from ..receiving.received_message import ConnectionQualityMeasurements
 
 class MockMedium:
     """A fake medium over wich MockSerialHelpers can communicate."""
@@ -30,8 +31,9 @@ class MockMedium:
 
         # Construct a received message.
         message_to_be_received = ReceivedMessage(
-            metadata={"LEN": packet_length, "RSSI": None, "SNR": None}, # TODO mock these values too in a realistic way.
-            hexpayload=hex_payload
+            hexpayload=hex_payload,
+            message_length=packet_length,
+            conn_qual=ConnectionQualityMeasurements(None, None) # TODO mock these values too in a realistic way.
         )
 
         for lora_controller in self.lora_controllers:

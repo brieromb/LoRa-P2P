@@ -51,7 +51,7 @@ class ReliableCommunicatingNode:
         else:
             print("Currently busy sending another message, adding to send queue")
     
-    def send_reliably_wait_for_answer(self, data: bytes, max_retries: int = 3, retransmission_timeout: float = 5.0) -> tuple[bytes, ConnectionQualityMeasurements]:
+    def send_reliably_wait_for_answer(self, data: bytes, max_retries: int = 2, retransmission_timeout: float = 2.0) -> tuple[bytes, ConnectionQualityMeasurements]:
         """Sends a message using best effort and blocks until a response is received or the max retries are reached.
         The response that is returned is a tuple containing the response bytes and the connection quality measurements.
         If the max retries are reached without getting any response, a TimeoutException is raised."""
@@ -108,7 +108,7 @@ class ReliableCommunicatingNode:
                     self.current_transmission = None # Clear the current transmission before handling the next one in the queue
                     self._handle_next_in_send_queue()
                 else:
-                    print(f"⚠️ WARNING: received response to an unknown message: {response.get_original_message_payload()}. Expected a response for {self.current_transmission.get_send_data()}")
+                    print(f"⚠️ WARNING: received response to an unknown message with digest: {response.get_original_message_digest()}. Expected a response for {self.current_transmission.get_send_data()}")
 
             except ValueError: # The message could not be interpreted as a response.
                 # So it must be an original new message that needs a response from this node.
@@ -129,16 +129,16 @@ def testReliableCommunicatingNode():
 
     # The receiving node is not yet initialized, so this should time out.
     try:
-        reliable_node1.send_reliably_wait_for_answer(b"Should not arrive", 1, 0.5)
+        reliable_node1.send_reliably_wait_for_answer(b"Should not arrive", max_retries=1)
         assert False, "No error was thrown, but the message couldn't have arrived."
     except TimeoutError:
-        print("Success: the message that couldn't arrive, did not arrive.")
+        print("Success: the message that couldn't arrive, did not arrive and correctly threw TimeoutError.")
 
     # Initialize a second node and do some more tests.
     node2 = LoRaNode(port="COM5")
     reliable_node2 = ReliableCommunicatingNode(node2)
 
-    answer = reliable_node2.send_reliably_wait_for_answer(b"LOL", 1, 0.5)
+    answer = reliable_node2.send_reliably_wait_for_answer(b"LOL")
     print(f"WAITED FOR AND GOT {answer}")
 
     reliable_node1.send_reliably(b"HELLO WORLD")
