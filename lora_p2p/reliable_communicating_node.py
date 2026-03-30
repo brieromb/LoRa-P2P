@@ -6,7 +6,7 @@ from .receiving.received_response import ReceivedResponse
 
 from .lora_node import LoRaNode
 from .receiving.received_message_data_parser import ReceivedMessage
-from .receiving.response import ResponsePayload
+from .receiving.response_payload import ResponsePayload
 from .transmission import Transmission, TransmissionState
 
 class ReliableCommunicatingNode:
