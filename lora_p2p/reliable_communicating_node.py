@@ -1,5 +1,4 @@
 import threading
-import time
 from queue import Queue
 
 from .receiving.received_message import ConnectionQualityMeasurements
@@ -7,7 +6,7 @@ from .receiving.received_response import ReceivedResponse
 
 from .lora_node import LoRaNode
 from .receiving.received_message_data_parser import ReceivedMessage
-from .receiving.response import ResponsePayload
+from .receiving.response_payload import ResponsePayload
 from .transmission import Transmission, TransmissionState
 
 class ReliableCommunicatingNode:
@@ -119,28 +118,3 @@ class ReliableCommunicatingNode:
                 self.lora_node.send(resp.as_bytes())
         else: 
             print(f"⚠️ WARNING: received message without payload: {message}")
-
-
-def testReliableCommunicatingNode():
-    # Some end-to-end tests for ReliableCommunicatingNode
-    
-    node1 = LoRaNode(port="COM4")
-    reliable_node1 = ReliableCommunicatingNode(node1)
-
-    # The receiving node is not yet initialized, so this should time out.
-    try:
-        reliable_node1.send_reliably_wait_for_answer(b"Should not arrive", max_retries=1)
-        assert False, "No error was thrown, but the message couldn't have arrived."
-    except TimeoutError:
-        print("Success: the message that couldn't arrive, did not arrive and correctly threw TimeoutError.")
-
-    # Initialize a second node and do some more tests.
-    node2 = LoRaNode(port="COM5")
-    reliable_node2 = ReliableCommunicatingNode(node2)
-
-    answer = reliable_node2.send_reliably_wait_for_answer(b"LOL")
-    print(f"WAITED FOR AND GOT {answer}")
-
-    reliable_node1.send_reliably(b"HELLO WORLD")
-    print("DID SOME WORK WHILE WAITING")
-    time.sleep(2)

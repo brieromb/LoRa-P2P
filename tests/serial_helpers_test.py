@@ -1,9 +1,10 @@
 import serial
 import time
-from serial_write_with_confirm import write_with_confirm
-from threaded_serial_reader import ThreadedSerialReader
 
-if __name__ == '__main__':
+from lora_p2p.lora_kit.serial_helper_code.serial_write_with_confirm import write_with_confirm
+from lora_p2p.lora_kit.serial_helper_code.threaded_serial_reader import ThreadedSerialReader
+
+def test_serial_helpers():
     ser1 = serial.Serial(port="COM5", baudrate=9600, timeout=1)
     reader = ThreadedSerialReader(ser1)
     reader.start()

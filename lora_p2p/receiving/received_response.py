@@ -2,7 +2,7 @@ from typing import override
 
 from ..transmission import Transmission
 
-from .response import ResponsePayload
+from .response_payload import ResponsePayload
 from .received_message import ReceivedMessage
 
 
