@@ -1,4 +1,3 @@
-import pickle
 import hashlib
 
 from .received_message_data_parser import ReceivedMessage
@@ -16,6 +15,9 @@ class ResponsePayload:
     # The fingerprint is sent together with the response,
     # so that the response can be linked back to the original message it responds to.
     MESSAGE_FINGERPRINT_LENGTH = 4
+
+    # The bytes that indicate that a message is a response. This is needed to distinguish responses from normal messages.
+    RESPONSE_INDICATOR = b'FFFF'
 
     def __init__(
             self,
@@ -47,8 +49,28 @@ class ResponsePayload:
         self.response_contents = response_contents
 
     @staticmethod
-    def from_bytes(bytes_response):
+    def from_bytes(bytes_response) -> ResponsePayload | None:
         """Tries to convert a response from raw bytes. If this didn't work None is retured."""
+        if bytes_response.startswith(ResponsePayload.RESPONSE_INDICATOR):
+            # The message is a response
+            bytes_response_without_indicator = bytes_response[len(ResponsePayload.RESPONSE_INDICATOR):]
+            if len(bytes_response_without_indicator) < ResponsePayload.MESSAGE_FINGERPRINT_LENGTH:
+                # The message is too short to contain a valid response.
+                print(f"⚠️ WARNING: A response was received, but it could not be interpreted. Got: {bytes_response}")
+                return None
+            # Extract the message digest and the message.
+            digest = bytes_response_without_indicator[:ResponsePayload.MESSAGE_FINGERPRINT_LENGTH]
+            response = bytes_response_without_indicator[ResponsePayload.MESSAGE_FINGERPRINT_LENGTH:]
+            return ResponsePayload(
+                response_for=digest,
+                response_contents=response,
+                _digest_provided=True # IMPORTANT. If this was not set, the message digest would get hashed again.
+            )
+        else:
+            return None
+    """
+    @staticmethod
+    def from_bytes(bytes_response):
         try: 
             dict_instance: dict = pickle.loads(bytes_response)
             # Check if the received dict is convertible to a response
@@ -69,16 +91,16 @@ class ResponsePayload:
         except pickle.UnpicklingError: # Can be thrown by the pickle.loads().
             # So if the load didn't work, the message is probably not a response.
             return None
-
+    """
     def is_response_for(self, earlier_message: bytes) -> bool:
         """Check if this response was a response for a certain earlier message."""
         # Hash the earlier message and compare the hash values
         expected_digest = self._calculate_message_digest(earlier_message)
         return self.original_message_digest == expected_digest
 
-    def as_bytes(self):
-        response_dict = {'original_message_digest': self.original_message_digest, 'response_contents': self.response_contents}
-        return pickle.dumps(response_dict)
+    def as_bytes(self) -> bytes:
+        """Convert this response to bytes, so that it can be sent over the medium."""
+        return self.RESPONSE_INDICATOR + self.get_original_message_digest() + self.get_contents()
     
     def get_original_message_digest(self) -> bytes:
         """Get the digest of the message that this response responded to."""

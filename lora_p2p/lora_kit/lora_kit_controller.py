@@ -3,6 +3,8 @@ import time
 
 import serial
 import string
+
+from lora_p2p.lora_kit.serial_helper_code.single_execution_guard import SingleExecutionGuard
 from .serial_helper_code.threaded_serial_reader import ThreadedSerialReader
 from .serial_helper_code.serial_write_with_confirm import write_with_confirm
 
@@ -56,8 +58,11 @@ class LoRaKitController:
         )
         self.threaded_serial_reader.start()
 
+        # Wait a bit to make sure the serial connection is properly set up before sending commands.
+        time.sleep(2) 
+
     def check_connection(self) -> bool:
-        return self._write_command_and_check_response(b'AT\r\n', b'+AT: OK')
+        return _write_command_and_check_response(self.ser, self.threaded_serial_reader, b'AT\r\n', b'+AT: OK')
     
     def set_communication_parameters(self, params: CommunicationParameters) -> bool:
     
@@ -82,14 +87,14 @@ class LoRaKitController:
         # Construct the expected response
         expected_response = f"+TEST: RFCFG F:{response_freq}, SF{params.spread_factor}, BW{params.bandwidth}K, TXPR:{params.tx_preamble_length}, RXPR:{params.rx_preamble_length}, POW:{params.tx_power}dBm, CRC:{crc_on_off}, IQ:{inverted_iq_on_off}, NET:{public_lora_wan_on_off}"
 
-        return self._write_command_and_check_response(command.encode(), expected_response.encode())
+        return _write_command_and_check_response(self.ser, self.threaded_serial_reader, command.encode(), expected_response.encode())
 
     
     def enable_test_mode(self) -> bool:
-        return self._write_command_and_check_response(b'AT+MODE=TEST\r\n', b'+MODE: TEST')
+        return _write_command_and_check_response(self.ser, self.threaded_serial_reader, b'AT+MODE=TEST\r\n', b'+MODE: TEST')
     
     def enable_listening(self) -> bool:
-        success = self._write_command_and_check_response(b'AT+TEST=RXLRPKT\r\n', b'+TEST: RXLRPKT')
+        success = _write_command_and_check_response(self.ser, self.threaded_serial_reader, b'AT+TEST=RXLRPKT\r\n', b'+TEST: RXLRPKT')
         if not success:
             raise RuntimeError("Couldn't enter listening mode")
         else:
@@ -110,32 +115,36 @@ class LoRaKitController:
         hex_message = hex_message.upper()
         
         command = (f'AT+TEST=TXLRPKT, "{hex_message}"\r\n').encode()
+        
+        # Before actually sending, check if the command is too large (> 528 bytes)
+        if len(command) > 528:
+            raise BufferError(f"The size of the AT command ({len(command)} bytes) exceeds the hardware limit of 528 bytes. Decrease the send payload.")
+        
         response = (f'+TEST: TXLRPKT "{hex_message}"\r\n+TEST: TX DONE').encode()
     
-        return self._write_command_and_check_response(command, response)
+        return  _write_command_and_check_response(self.ser, self.threaded_serial_reader, command, response)
 
     def handle_incoming_message_line(self, line):
         result = self.received_message_data_handler.process_message_line(line)
         if result:
             # Give the message to the callback that handles the ReceivedMessages.
             self.received_message_handler(result)
-
-    def _write_command_and_check_response(self, command, expected_response) -> bool:
-        ####if not self.threaded_serial_reader.is_paused():
-        ####    raise RuntimeError("should first pause the threaded serial reader before trying to write a command.")
-        self.threaded_serial_reader.pause()
-
-        (success, _, response) = write_with_confirm(self.ser, command, expected_response)
-
-        if not success:
-            print(f"⚠️ WARNING: AT command '{command}' got unexpected response: '{response}'. Expected '{expected_response}' instead.")
-        return success
     
     def is_listening(self) -> bool:
         return not self.threaded_serial_reader.is_paused()
 
+@SingleExecutionGuard
+def _write_command_and_check_response(ser, threaded_ser_reader, command, expected_response) -> bool:
+    threaded_ser_reader.pause()
 
-if __name__ == '__main__':
+    (success, _, response) = write_with_confirm(ser, command, expected_response)
+
+    if not success:
+        print(f"⚠️ WARNING: AT command '{command}' got unexpected response: '{response}'. Expected '{expected_response}' instead.")
+    return success
+
+
+def test_lora_kit_controller():
     ser = serial.Serial('COM4')
     helper = LoRaKitController(ser)
 
