@@ -1,6 +1,6 @@
 # Peer-to-peer communication using LoRa Wio-E5 Development Kits
 This repository provides a Python module interface for communication using LoRa Wio-E5 Development Kits in peer-to-peer TEST mode.
-It also provides an example application built on this python module that serves as a http-over-radio tunnel.
+It also provides an example application built on this python module that serves as a http-over-radio tunnel (see `./http_tunnel`)
 
 ## Dependencies
 **Hardware**: To be able to use this module and its applications, you need at least two [LoRa Wio-E5 Development Kits](https://wiki.seeedstudio.com/LoRa_E5_Dev_Board/) that will communicate with each other.
