@@ -1,25 +1,20 @@
-# LoRa-P2P
-A Python interface for using LoRa Wio-E5 Development Kits for reliable Peer to Peer communication.
+# Peer-to-peer communication using LoRa Wio-E5 Development Kits
+This repository provides a Python module interface for communication using LoRa Wio-E5 Development Kits in peer-to-peer TEST mode.
+It also provides an example application built on this python module that serves as a http-over-radio tunnel.
 
 ## Dependencies
-This package only uses the `pyserial` library. It can be installed here: [The official PySerial docs](https://www.pyserial.org/docs)
+**Hardware**: To be able to use this module and its applications, you need at least two [LoRa Wio-E5 Development Kits](https://wiki.seeedstudio.com/LoRa_E5_Dev_Board/) that will communicate with each other.
+Though, this module also provides a way to use mocked hardware for local testing.
+
+**Software**: This module is a Python module that only uses the `pyserial` library, which is a library used to communicate with external hardware over a serial port. Here are the official docs of this library: [The official PySerial docs](https://www.pyserial.org/docs)
 
 ## How to use
 This section goes over the steps necessary to use the package and shows an example usage.
 
-### Preparation
-After installing the `pyserial` library you need to find out what the port name is of the port that your LoRa node(s) is/are connected to.
-You can do this as follows:
-```py
-import serial.tools.list_ports
+### Finding the port name
+You first need to find out what the port name is of the port that your LoRa node(s) is/are connected to.
 
-ports = serial.tools.list_ports.comports()
-for port in ports:
-    print(f"{port.device}: {port.description}")
-```
-Now that you know the port, you can start sending messages.
-
-If you do not have the LoRa kit connected to your PC at the moment, you can still execute example code by leaving the port parameter blank. This creates a mock instance of the LoRa module controller that will simulate the behaviour of a controller that is connected to real hardware.
+If you want to locally test the functionality of the code, but you do not have the LoRa kit connected to your PC; You can still execute example code by leaving the port parameter blank. This creates a mock instance of the LoRa module controller that will simulate the behaviour of a controller that is connected to real hardware.
 
 ### Example
 ```py
@@ -55,12 +50,16 @@ except TimeoutError:
     print("The message did not get a reply in the specified amout of tries")
 # The reply should be b'World'
 ```
-## What this builds upon
-This is all built upon the P2P functionality of the TEST mode in Wio-E5 Development Kits. These development kits can either listen or send. If they send, they stop listening for received packages until listening is explicitly enabled again. More information about these modules in TEST mode can be found in the [official documentation for Wio-E5 Development Kits](https://files.seeedstudio.com/products/317990687/res/LoRa-E5%20AT%20Command%20Specification_V1.0%20.pdf)
+## Peer to peer TEST mode
+This is all built upon the P2P functionality of the TEST mode in Wio-E5 Development Kits. These development are originally made for LoRaWAN communication and have limited functionality for peer-to-peer communication.
+The TEST mode is the only mode of this hardware kit that allows for P2P communications. So this Python module builds on this.
 
-A Normal setup for enabling listening and sending is given here:
+The TEST mode allows for sending hex strings with a limited length of less than 528 characters. And whenever a node sends a message, it stops listening until listening is explicitly enabled again with an AT command.
+More information about these modules in TEST mode can be found in the [official documentation for Wio-E5 Development Kits](https://files.seeedstudio.com/products/317990687/res/LoRa-E5%20AT%20Command%20Specification_V1.0%20.pdf)
 
-### Sending
+### Sending in TEST mode
+
+An example sequence of AT commands sent to the hardware for sending a message:
 ```
 > AT //checking the connection
 +AT: OK 
@@ -73,7 +72,9 @@ A Normal setup for enabling listening and sending is given here:
 +TEST: TX DONE
 ```
 
-### Receiving
+### Receiving in TEST mode
+
+An example sequence of AT commands sent to the hardware for enabling listening:
 ```
 > AT //checking the connection
 +AT: OK 
@@ -89,18 +90,12 @@ A Normal setup for enabling listening and sending is given here:
 +TEST: RX "001234556789ABCDEF"
 ```
 
-## Class structure
-class dependencies: 
-```
-(format: <some_class> -> <classes_it_uses_to_work>)
+## How it works
+Sending the AT commands for sending and receiving in TEST mode happens at the bottom of the stack.
+The AT commands are sent by the `LoRaKitController`. This class also checks if the AT command responses are as expected.
+It uses some helper classes that use the `pyserial` library for the serial port communication.
 
-ReliableCommunicatingNode -> LoRaNode
-LoRaNode -> LoRaKitController, EitherSendOrListenNodeInterface
-LoRaKitController -> ThreadedSerialReader, ReceivedDataMessageHandler
-```
+The `LoRaNode` abstracts the usage of AT commands, but uses a `LoRaKitController` under the hood.
 
-explanation:
-- `ReliableCommunicatingNode`: uses a `LoRaNode` to send and receive messages, but on top of that, uses acknowledgements and retransmissions after a set timeout.
-- `LoraNode`: is an implementation of `EitherSendOrListenNodeInterface`. Uses a `LoRaKitController` instance to initialise the LoRa module connected via a serial port and to send commands through the serial port to the LoRa device.
-- `LoRaKitController`: has high level commands such as check_connection() and enable_listening(). It uses `write_with_confirm` to write a command over the serial connection and also check the response. It also uses a class `ThreadedSerialReader` to monitor the serial port for incoming messages. When a message comes in, it uses a `ReceivedDataMessageParser` to parse the lines as a `ReceivedMessage`
-- `ThreadedSerialReader`: A class that monitors the serial port using a separate thread. It checks periodically after a certain timeout if there is a serial incoming message to be read. When some input is received, the thread handles it using the given callback given from higher up.
+`ReliableCommunicatingNode` builds on the functionality of a `LoRaNode`, but provides a way to have more reliable communication.
+It allows to wait for a response to a sent message. In case of the message getting lost or the response not arriving, this class can also perform retransmissions after a set time, similar to the TCP protocol.
