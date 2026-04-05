@@ -24,10 +24,12 @@ This application uses only the following python modules:
 These can all be installed using `pip install`
 
 ## How to setup
+The following steps are to set up a single side of the tunnel.
+You need to go through the steps for both tunnel sides.
 
 1) Install the dependencies.
 
-2) change the `config.py` file with the correct values for your setup.
+2) change the `config.py` file with the correct values for the setup of this tunnel side.
 
 3) Run the application on the command line using
     ```cmd
