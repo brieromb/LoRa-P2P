@@ -33,3 +33,4 @@ These can all be installed using `pip install`
     ```cmd
     $ python -m http_tunnel
     ```
+4) Now you can send http messages to one of the tunnel sides, which will be passed on over the LoRa medium and then handled by the server on the other side. The answer of the server will travel back over the LoRa medium and arrive at the original sender.
