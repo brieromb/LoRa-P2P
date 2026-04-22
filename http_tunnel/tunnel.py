@@ -88,6 +88,18 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
     radio = ReliableCommunicatingNode(node, on_radio_request)
     app   = FastAPI(title="Radio HTTP Tunnel")
 
+    # =============== OPTIONAL: Connectivity monitoring endpoint ===============
+    # Store latest connectivity measurements (for monitoring/debugging)
+    rssi: int | None = None
+    snr:  int | None = None
+
+    @app.api_route("/connectivity", methods=["GET"])
+    async def connectivity():
+        """Endpoint to get connectivity measurements (rssi, snr) of the radio"""
+        return {"rssi": rssi, "snr": snr}
+    
+    # ==============================================================================
+
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
     async def tunnel_request(path: str, request: Request):
         body      = await request.body()
@@ -106,6 +118,14 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
                 max_retries=RETRIES, retransmission_timeout=RETRANSMIT_TIMEOUT,
             )
             resp = deserialize_response(answer_data[0])
+
+            # =============== Update connectivity measurements ===============
+            connectivity_measurements = answer_data[1]
+            global rssi, snr
+            rssi = connectivity_measurements.rssi
+            snr  = connectivity_measurements.snr
+            # ==============================================================================
+
             log.info(f"Returning HTTP {resp['status']} to caller")
             return Response(content=resp["body"].encode(), status_code=resp["status"], headers=resp["headers"])
         except TimeoutError:
