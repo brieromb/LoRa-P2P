@@ -36,3 +36,10 @@ You need to go through the steps for both tunnel sides.
     $ python -m http_tunnel
     ```
 4) Now you can send http messages to one of the tunnel sides, which will be passed on over the LoRa medium and then handled by the server on the other side. The answer of the server will travel back over the LoRa medium and arrive at the original sender.
+
+# Connectivity endpoint
+This tunnel application also provides a `/connectivity` endpoint. This is not strictly necessary for the functionality of the `http_tunnel`, so it can be omitted.
+
+This endpoint returns the latest SNR and RSSI measurements of the radio communication. This can be used for debugging or to display the connection quality.
+
+It can be expanded upon to for example show the connectivity measurements over time, so that it can be plotted.
