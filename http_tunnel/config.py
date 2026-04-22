@@ -10,7 +10,7 @@ RETRANSMIT_TIMEOUT = 2.0
 
 # ======== TUNNEL SETTINGS ========
 # Local IP to bind the tunnel server to.
-TUNNEL_IP          = "0.0.0.0" 
+TUNNEL_IP          = "localhost" 
 # The port on which the tunnel will listen for incoming HTTP requests.
 TUNNEL_PORT        = 8000
 

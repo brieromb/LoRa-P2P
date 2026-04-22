@@ -109,9 +109,14 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
 
         log.info(f"Tunnelling {request.method} {full_path} over radio")
         skip    = {"host", "content-length", "transfer-encoding", "connection"}
-        headers = {k: v for k, v in request.headers.items() if k.lower() not in skip}
+        #headers = {k: v for k, v in request.headers.items() if k.lower() not in skip}
+        headers = {}
         packet  = serialize_request(request.method, full_path, headers, body)
-
+        """
+        # DEBUG
+        for k, v in headers.items():
+            print(f"  {k}: {v}")
+        """
         try:
             answer_data = await asyncio.to_thread(
                 radio.send_reliably_wait_for_answer, packet,
