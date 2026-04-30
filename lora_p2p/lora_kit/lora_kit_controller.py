@@ -44,6 +44,9 @@ class LoRaKitController:
     """Class that provides a high level interface for sending AT commands to a LoRa module
     over a serial connection, using pyserial."""
 
+    # hardware limit - command overhead
+    MAX_MESSAGE_BYTES = 528 - len('AT+TEST=TXLRPKT, ""\r\n')
+
     def __init__(self, ser: serial.Serial, received_message_handler=lambda x: print(x)):
 
         self.ser = ser
@@ -114,12 +117,11 @@ class LoRaKitController:
         
         # letters to upper case, because the received response always is received in upper case
         hex_message = hex_message.upper()
+
+        if len(hex_message) > self.MAX_MESSAGE_BYTES * 2: # Each byte is represented by 2 hex characters
+            raise BufferError(f"The size of the message ({len(payload)} bytes) exceeds the hardware limit of {self.MAX_MESSAGE_BYTES} bytes. Decrease the send payload.")
         
         command = (f'AT+TEST=TXLRPKT, "{hex_message}"\r\n').encode()
-        
-        # Before actually sending, check if the command is too large (> 528 bytes)
-        if len(command) > 528:
-            raise BufferError(f"The size of the AT command ({len(command)} bytes) exceeds the hardware limit of 528 bytes. Decrease the send payload.")
         
         response = (f'+TEST: TXLRPKT "{hex_message}"\r\n+TEST: TX DONE').encode()
     
