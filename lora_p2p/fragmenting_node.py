@@ -64,31 +64,36 @@ class BigMessage:
     MAX_AMOUNT_FRAGMENTS = 8**Fragment.TOTAL_FRAGS_BYTES - 1 # Max representable id in the fragment header.
     MAX_ID = 8**Fragment.MESSAGE_ID_BYTES - 1
 
-    def __init__(self, id: int, data: bytes):
-        """Splits the given data into fragments, and assigns them a message id and sequence numbers."""
+    def __init__(self, fragments: list[Fragment]):
+        """Construct an incomplete BigMessage using Fragments.
+        This constructor assumes all fragments have the same message id and no duplicates are in the list."""
 
-        self.id = id
-        self.fragments: list[Fragment] = []
-        self.total_fragments = len(data) // Fragment.MAX_PAYLOAD_SIZE + (1 if len(data) % Fragment.MAX_PAYLOAD_SIZE > 0 else 0)
-        if self.total_fragments > self.MAX_AMOUNT_FRAGMENTS:
-            raise RuntimeError(f"The message could not be fragmented. Otherwise too many fragments ({self.total_fragments}). The Fragment header only supports up to {self.MAX_AMOUNT_FRAGMENTS} fragments per message.")
+        assert len(fragments) > 0, "Need at least one fragment to start constructing a BigMessage."
+        self.fragments = fragments
+        self.total_fragments = fragments[0].total_fragments
+        self.id = fragments[0].message_id
+
+    @classmethod
+    def from_bytes(cls, id: int, data: bytes):
+        """Construct a new BigMessage by splitting the given data into fragments, and assigning them a message id and sequence numbers."""
+
+        fragments: list[Fragment] = []
+        total_fragments = len(data) // Fragment.MAX_PAYLOAD_SIZE + (1 if len(data) % Fragment.MAX_PAYLOAD_SIZE > 0 else 0)
+        if total_fragments > cls.MAX_AMOUNT_FRAGMENTS:
+            raise RuntimeError(f"The message could not be fragmented. Otherwise too many fragments ({total_fragments}). The Fragment header only supports up to {cls.MAX_AMOUNT_FRAGMENTS} fragments per message.")
         for i in range(0, len(data), Fragment.MAX_PAYLOAD_SIZE):
             fragment_data = data[i:i + Fragment.MAX_PAYLOAD_SIZE]
             fragment = Fragment(
-                self.id,
-                self.total_fragments,
+                id,
+                total_fragments,
                 i // Fragment.MAX_PAYLOAD_SIZE,
                 fragment_data
             )
-            self.fragments.append(fragment)
-        if len(self.fragments) < self.total_fragments:
+            fragments.append(fragment)
+        if len(fragments) < total_fragments:
             raise RuntimeError("Error while creating fragments: not enough fragments created for the given data and max fragment size.")
-    
-    def __init__(self, fragment: Fragment):
-        """Construct an incomplete BigMessage using a received Fragment"""
-        self.fragments = [fragment]
-        self.total_fragments = fragment.total_fragments
-        self.id = fragment.message_id
+        # Create the object and return it.
+        return cls(fragments)
     
     def add_fragment(self, fragment: Fragment) -> bool:
         """Adds a fragment to an incomplete BigMessage. Returns whether the addition was successful."""
@@ -147,7 +152,7 @@ class FragmentingNode:
     def send_message(self, large_data: bytes):
         # New id for the message.
         id = self._generate_message_id()
-        big_message = BigMessage(id, large_data, False)
+        big_message = BigMessage.from_bytes(id, large_data)
         fragments: list[Fragment] = big_message.get_fragments()
 
         # Send all fragments one by one for now. For simplicity.
@@ -165,7 +170,7 @@ class FragmentingNode:
                 raise TimeoutError(f"Time out in waiting for ACK for packet {i} out of {len(fragments)}, in sending a large message of {len(large_data)} bytes.")
         # The message was completely sent and received on the other side.
 
-    def _handle_received(self, message_tuple: tuple[bytes,ConnectionQualityMeasurements]):
+    def _handle_received(self, message_tuple: tuple[bytes,ConnectionQualityMeasurements]) -> bytes:
         """Handles receiving messages. This function is the underlying ReliableCommunicatingNode's `incoming_message_handler`.
         It handles received Fragments of BigMessages"""
 
@@ -180,14 +185,17 @@ class FragmentingNode:
                 matching_message.add_fragment(fragment)
             else:
                 # This is the first fragment received for this message. This fragment starts a new message reconstruction.
-                matching_message: BigMessage = BigMessage(fragment)
+                matching_message: BigMessage = BigMessage([fragment])
                 self.incomplete_messages[matching_message.id] = matching_message
 
             if matching_message.is_complete():
                 # Remove the message from the incompleted messages.
                 self.incomplete_messages.pop(matching_message.id)
                 # Return the completed message to the callback.
-                self.incoming_message_handler(matching_message)
+                self.incoming_message_handler(matching_message.get_payload())
+
+            # Return ACK for receiving the fragment.
+            return fragment.get_expected_ack_message()
             
         except ValueError:
             print(f"⚠️ WARNING: FragmentingNode received a message that couldn't be interpreted as a Fragment: {message_data}. Dropping message.")
