@@ -98,7 +98,7 @@ class BigMessage:
     def add_fragment(self, fragment: Fragment) -> bool:
         """Adds a fragment to an incomplete BigMessage. Returns whether the addition was successful."""
         # Check if the message is complete already and the fragment has the right id.
-        if self.is_complete() or self.id != fragment.id:
+        if self.is_complete() or self.id != fragment.message_id:
             return False
         # Check if fragment with this sequence number is already present.
         for f in self.fragments:
