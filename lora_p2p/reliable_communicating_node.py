@@ -35,7 +35,7 @@ class ReliableCommunicatingNode:
 
         self.current_transmission : Transmission = None # The transmission that is currently being sent/waiting for ACK
 
-    def send_reliably(self, data: bytes, max_retries: int = 3, retransmission_timeout: float = 5.0):
+    def send_reliably(self, data: bytes, max_retries: int = 2, retransmission_timeout: float = 2.0):
         """Sends a message using best effort, but non-blocking.
         If no response is sent within the retransmission timeout,
         it will retry until the number of max retries is reached."""

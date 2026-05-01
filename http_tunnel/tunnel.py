@@ -13,7 +13,7 @@ import logging
 import requests
 
 from fastapi import FastAPI, Request, Response
-from lora_p2p import LoRaNode, ReliableCommunicatingNode
+from lora_p2p import LoRaNode, MainNode
 from .config import RETRIES, RETRANSMIT_TIMEOUT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -64,7 +64,7 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
     Args:
         forward_to_url: Base URL to forward inbound radio requests to.
         node:           A LoRaNode instance (real or mock). make_app() wraps it
-                        in a ReliableCommunicatingNode internally.
+                        in a MainNode internally.
     """
 
     def on_radio_request(message_data: tuple) -> bytes:
@@ -85,7 +85,7 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
             log.error(f"Failed to forward request: {e}")
             return json.dumps({"status": 502, "headers": {}, "body": f"Tunnel error: {e}"}).encode()
 
-    radio = ReliableCommunicatingNode(node, on_radio_request)
+    radio = MainNode(node, on_radio_request)
     app   = FastAPI(title="Radio HTTP Tunnel")
 
     # =============== OPTIONAL: Connectivity monitoring endpoint ===============
@@ -119,8 +119,8 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
         """
         try:
             answer_data = await asyncio.to_thread(
-                radio.send_reliably_wait_for_answer, packet,
-                max_retries=RETRIES, retransmission_timeout=RETRANSMIT_TIMEOUT,
+                radio.send_and_wait, packet,
+                max_retries_packet=RETRIES, retransmission_timeout_packet=RETRANSMIT_TIMEOUT,
             )
             resp = deserialize_response(answer_data[0])
 

@@ -146,7 +146,7 @@ class FragmentingNode:
         self.incomplete_messages: dict[int, BigMessage] = dict() # BigMessage id -> incomplete BigMessage
         self.incoming_message_handler = incoming_message_handler
     
-    def send_message(self, large_data: bytes):
+    def send_message(self, large_data: bytes, max_retries_packet:int, retransmission_timeout_packet:float):
         # New id for the message.
         id = self._generate_message_id()
         big_message = BigMessage.from_bytes(id, large_data)
@@ -157,7 +157,11 @@ class FragmentingNode:
             frag_bytes = fragment.serialize()
             try:
                 # TODO find good retransmission parameters
-                response_tuple = self.reliable_communicating_node.send_reliably_wait_for_answer(frag_bytes)
+                response_tuple = self.reliable_communicating_node.send_reliably_wait_for_answer(
+                    frag_bytes,
+                    max_retries=max_retries_packet,
+                    retransmission_timeout=retransmission_timeout_packet
+                )
                 response_data = response_tuple[0]
                 # Check if the response is as expected an ACK for the sent message.
                 expected_ack: bytes = fragment.get_expected_ack_message()
