@@ -9,12 +9,11 @@ class Fragment:
     | msg_id | total_frags | seq_num | payload_len | data |
     """
     MESSAGE_ID_BYTES = 4
-    TOTAL_FRAGS_BYTES = 2
-    SEQ_NUM_BYTES = 2
-    PAYLOAD_LEN_BYTES = 2 # TODO maybe remove
+    TOTAL_FRAGS_BYTES = 3
+    SEQ_NUM_BYTES = TOTAL_FRAGS_BYTES
 
-    TOTAL_HEADER_LEN = MESSAGE_ID_BYTES + TOTAL_FRAGS_BYTES + SEQ_NUM_BYTES + PAYLOAD_LEN_BYTES
-    MAX_PAYLOAD_SIZE = 50 # TODO derive this from hardware limit.
+    TOTAL_HEADER_LEN = MESSAGE_ID_BYTES + TOTAL_FRAGS_BYTES + SEQ_NUM_BYTES
+    MAX_PAYLOAD_SIZE = 110 # TODO derive this from hardware limit.
 
     def __init__(self, message_id: int, total_fragments: int, sequence_number: int, data: bytes):
         self.data = data
@@ -33,7 +32,6 @@ class Fragment:
             self.message_id.to_bytes(self.MESSAGE_ID_BYTES, byteorder='big') +
             self.total_fragments.to_bytes(self.TOTAL_FRAGS_BYTES, byteorder='big') +
             self.sequence_number.to_bytes(self.SEQ_NUM_BYTES, byteorder='big') +
-            self.payload_length.to_bytes(self.PAYLOAD_LEN_BYTES, byteorder='big') +
             self.data
         )
     
@@ -46,8 +44,7 @@ class Fragment:
         message_id = int.from_bytes(bytes_data[0:Fragment.MESSAGE_ID_BYTES], byteorder='big')
         total_fragments = int.from_bytes(bytes_data[Fragment.MESSAGE_ID_BYTES:Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES], byteorder='big')
         sequence_number = int.from_bytes(bytes_data[Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES:Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES + Fragment.SEQ_NUM_BYTES], byteorder='big')
-        payload_length = int.from_bytes(bytes_data[Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES + Fragment.SEQ_NUM_BYTES:Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES + Fragment.SEQ_NUM_BYTES + Fragment.PAYLOAD_LEN_BYTES], byteorder='big')
-        data = bytes_data[Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES + Fragment.SEQ_NUM_BYTES + Fragment.PAYLOAD_LEN_BYTES:Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES + Fragment.SEQ_NUM_BYTES + Fragment.PAYLOAD_LEN_BYTES + payload_length]
+        data = bytes_data[Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES + Fragment.SEQ_NUM_BYTES:]
         return Fragment(message_id, total_fragments, sequence_number, data)
 
 

@@ -30,7 +30,7 @@ class MockMedium:
         packet_length *= 2 # Packet length in bytes is always the hex string length * 2
 
         if packet_length > MockLoRaKitController.MAX_MESSAGE_BYTES:
-            raise BufferError(f"The size of the message ({len(payload)} bytes) exceeds the hardware limit of {MockLoRaKitController.MAX_MESSAGE_BYTES} bytes. Decrease the send payload.")
+            raise BufferError(f"The size of the message ({packet_length} bytes) exceeds the hardware limit of {MockLoRaKitController.MAX_MESSAGE_BYTES} bytes. Decrease the send payload.")
 
         # Construct a received message.
         message_to_be_received = ReceivedMessage(

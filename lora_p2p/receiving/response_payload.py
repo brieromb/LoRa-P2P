@@ -4,9 +4,9 @@ from .received_message_data_parser import ReceivedMessage
 
 class ResponsePayload:
     """Represents a response payload to a previously sent message.
-    A response is sent over the medium as a dict like:
-    
-    {response_for: <bytes>, response_contents: <bytes>} (but encoded as bytes)
+    A response is sent over the medium as a bytes, with a header and then its contents, like this:
+
+    FFFF | <received_message_fingerprint> | <data>
 
     And when a message is received, it is decoded and checked if it is of the format expected from a response payload. 
     """
