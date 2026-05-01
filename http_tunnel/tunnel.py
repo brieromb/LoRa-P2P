@@ -13,7 +13,7 @@ import logging
 import requests
 
 from fastapi import FastAPI, Request, Response
-from lora_p2p import LoRaNode, MainNode
+from lora_p2p import LoRaNode, MainNode, ConnectionQualityMeasurements
 from .config import RETRIES, RETRANSMIT_TIMEOUT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -85,18 +85,23 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
             log.error(f"Failed to forward request: {e}")
             return json.dumps({"status": 502, "headers": {}, "body": f"Tunnel error: {e}"}).encode()
 
-    radio = MainNode(node, on_radio_request)
+    radio = MainNode(node, on_radio_request, RETRIES, RETRANSMIT_TIMEOUT)
     app   = FastAPI(title="Radio HTTP Tunnel")
 
     # =============== OPTIONAL: Connectivity monitoring endpoint ===============
-    # Store latest connectivity measurements (for monitoring/debugging)
-    rssi: int | None = None
-    snr:  int | None = None
+    # Store connectivity measurements (for monitoring/debugging)
+    connection_measurements: list[ConnectionQualityMeasurements] = list()
+    print(connection_measurements)
 
     @app.api_route("/connectivity", methods=["GET"])
     async def connectivity():
         """Endpoint to get connectivity measurements (rssi, snr) of the radio"""
-        return {"rssi": rssi, "snr": snr}
+        rssis = []
+        snrs = []
+        for measurement in connection_measurements:
+            rssis.append(measurement.rssi)
+            snrs.append(measurement.snr)
+        return {"rssi": rssis, "snr": snrs}
     
     # ==============================================================================
 
@@ -120,15 +125,12 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
         try:
             answer_data = await asyncio.to_thread(
                 radio.send_and_wait, packet,
-                max_retries_packet=RETRIES, retransmission_timeout_packet=RETRANSMIT_TIMEOUT,
             )
             resp = deserialize_response(answer_data[0])
 
             # =============== Update connectivity measurements ===============
-            connectivity_measurements = answer_data[1]
-            global rssi, snr
-            rssi = connectivity_measurements.rssi
-            snr  = connectivity_measurements.snr
+            connection_measurements.extend(answer_data[1]) # Add connection quality measurements.
+
             # ==============================================================================
 
             log.info(f"Returning HTTP {resp['status']} to caller")

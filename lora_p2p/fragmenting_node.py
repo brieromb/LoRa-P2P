@@ -21,6 +21,7 @@ class Fragment:
         self.total_fragments = total_fragments
         self.sequence_number = sequence_number
         self.payload_length = len(data)
+        self.connection_measurements = None
     
     def get_expected_ack_message(self) -> bytes:
         """ACK message for the fragment, containing the message id and sequence number."""
@@ -46,6 +47,13 @@ class Fragment:
         sequence_number = int.from_bytes(bytes_data[Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES:Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES + Fragment.SEQ_NUM_BYTES], byteorder='big')
         data = bytes_data[Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES + Fragment.SEQ_NUM_BYTES:]
         return Fragment(message_id, total_fragments, sequence_number, data)
+
+    def save_connection_measurements(self, measurements: ConnectionQualityMeasurements):
+        self.connection_measurements = measurements
+    
+    def get_connection_measurements(self) -> ConnectionQualityMeasurements | None:
+        return self.connection_measurements
+            
 
 
 class BigMessage:
@@ -109,7 +117,7 @@ class BigMessage:
         """Whether the BigMessage has all of its frames."""
         return len(self.fragments) == self.total_fragments
     
-    def get_payload(self) -> bytes:
+    def get_payload_tuple(self) -> bytes:
         """Returns the entire payload of a complete BigMessage,
         consisting of the concatenation of the contents of the in-order fragments."""
 
@@ -119,9 +127,11 @@ class BigMessage:
         # Sort the fragments based on sequence number and concatenate their contents.
         sorted_fragments = sorted(self.fragments, key=lambda obj: obj.sequence_number)
         complete_message = bytes()
+        connection_measurements: list[ConnectionQualityMeasurements] = []
         for fragment in sorted_fragments:
             complete_message += fragment.data
-        return complete_message
+            connection_measurements.append(fragment.get_connection_measurements())
+        return (complete_message, connection_measurements)
 
     def get_fragments(self) -> list[Fragment]:
         return self.fragments
@@ -136,7 +146,8 @@ class FragmentingNode:
         """Constructs a FragmentingNode.
         Args:
                 lora_node: An instantiated LoRaNode
-                incoming_message_handler: custom handler that handles complete incoming message payloads."""
+                incoming_message_handler: custom handler that handles complete incoming message tuples.
+                    message tuples are (bytes, list[ConnectionQualityMeasurements])"""
 
         # Use an underlying ReliableCommunicatingNode for sending Fragments.
         self.reliable_communicating_node = ReliableCommunicatingNode(
@@ -178,6 +189,7 @@ class FragmentingNode:
         message_data: bytes = message_tuple[0]
         try:
             fragment: Fragment = Fragment.from_bytes(message_data)
+            fragment.save_connection_measurements(message_data[1]) # Save the measurements for receiving this fragment.
             matching_message: BigMessage
             # Find the matching incomplete message for this fragment (or create a new one if no match)
             if fragment.message_id in self.incomplete_messages:
@@ -193,7 +205,7 @@ class FragmentingNode:
                 # Remove the message from the incompleted messages.
                 self.incomplete_messages.pop(matching_message.id)
                 # Return the completed message to the callback.
-                self.incoming_message_handler(matching_message.get_payload())
+                self.incoming_message_handler(matching_message.get_payload_tuple())
 
             # Return ACK for receiving the fragment.
             return fragment.get_expected_ack_message()

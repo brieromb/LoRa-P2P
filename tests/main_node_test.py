@@ -1,14 +1,16 @@
 from lora_p2p import MainNode, LoRaNode
 
 def test_main_node():
-    def receive_callback1(_: bytes):
+    def receive_callback1(received):
         message = b'Node 1: Roger that.'
         print(message)
+        print(received)
         return message
 
-    def receive_callback2(_: bytes):
+    def receive_callback2(received):
         message = b'Node 2: Roger that.'
         print(message)
+        print(received)
         return message
 
 

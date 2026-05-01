@@ -1,3 +1,5 @@
+from lora_p2p.receiving.received_message import ConnectionQualityMeasurements
+
 from .fragmenting_node import FragmentingNode
 from .lora_node import LoRaNode
 
@@ -13,23 +15,32 @@ class MainNode:
     PREAMBLE_LENGTH = len(RESPONSE_IDENTIFIER)
     HEADER_LENGTH = PREAMBLE_LENGTH + MESSAGE_ID_SIZE_BYTES
 
-    def __init__(self, lora_node: LoRaNode, incoming_message_handler=lambda x: b'Whatever dude.'):
+    def __init__(self,
+                 lora_node: LoRaNode,
+                 incoming_message_handler=lambda x: b'Whatever dude.',
+                 max_retries_packet:int = 2,
+                 retransmission_timeout_packet:float = 2.0
+                ):
         """Initializes a MainNode.
         
         Args:
             lora_node: an instance of a real or mock LoRaNode.
-            incoming_message_handler: A message handler that receives incoming messages and returns a response to them."""
+            incoming_message_handler: A message handler that receives incoming messages `tuple(bytes, list[ConnectionQualityMeasurements])` and returns a response to them.
+            max_retries_packet:
+            retransmission_timeout_packet"""
 
         assert len(self.REQUEST_IDENTIFIER) == len(self.RESPONSE_IDENTIFIER), "Request- and response identifiers should be of the same length."
 
         self.fragmenting_node: FragmentingNode = FragmentingNode(lora_node, self._handle_random_incoming_message)
         self.incoming_message_handler = incoming_message_handler
+        self.max_retries_packet = max_retries_packet
+        self.retransmission_timeout_packet = retransmission_timeout_packet
 
         self.waiting_messages : dict[bytes, threading.Event] = dict() # Receive events for all waiting messages.
-        self.unhandled_responses : dict[bytes, bytes] = dict() # Unhandled responses for messages.
+        self.unhandled_responses : dict[bytes, tuple[bytes, list[ConnectionQualityMeasurements]]] = dict() # Unhandled responses for messages.
         self.lock = threading.Lock() # Lock for the dict objects.
     
-    def send_and_wait(self, payload: bytes, max_retries_packet:int = 2, retransmission_timeout_packet:float = 2.0) -> bytes:
+    def send_and_wait(self, payload: bytes) -> tuple[bytes, list[ConnectionQualityMeasurements]]:
         """Sends some message in bytes. Waits for and returns the response.
         If one of the packets could not arrive, a TimeourError is thrown."""
         with self.lock:
@@ -41,7 +52,7 @@ class MainNode:
 
         # construct complete message and send.
         complete_message = self.REQUEST_IDENTIFIER + id + payload
-        self.fragmenting_node.send_message(complete_message, max_retries_packet, retransmission_timeout_packet)
+        self.fragmenting_node.send_message(complete_message, self.max_retries_packet, self.retransmission_timeout_packet)
 
         if receive_event.wait(): # No timeout. The packets themselves will throw TimeoutErrors
             # Succesfully received the message.
@@ -54,10 +65,12 @@ class MainNode:
             raise TimeoutError("Timer ran out before receiving the response.")
 
     
-    def _handle_random_incoming_message(self, payload: bytes) -> None:
+    def _handle_random_incoming_message(self, message_tuple: tuple[bytes, list[ConnectionQualityMeasurements]]) -> None:
         """Callback that handles all incoming messages.
-        It handles both new messages it needs to respond to and responses to earlier sent messages.
+        It handles both new messages and responses to earlier sent messages.
         This method can distinguish the two cases and act accordingly."""
+        payload = message_tuple[0]
+
         if len(payload) < self.PREAMBLE_LENGTH + self.MESSAGE_ID_SIZE_BYTES:
             print("⚠️ WARNING: A message was received that was too short to contain the necessary header information. Dropping message.")
             return
@@ -66,17 +79,17 @@ class MainNode:
 
         if preamble == self.REQUEST_IDENTIFIER:
             # Handle new message. Formulate a response.
-            response = self.incoming_message_handler(payload[self.HEADER_LENGTH:])
+            response = self.incoming_message_handler((payload[self.HEADER_LENGTH:], message_tuple[1]))
             # Add header and send the response
             full_response = self.RESPONSE_IDENTIFIER + id + response
-            self.fragmenting_node.send_message(full_response)
+            self.fragmenting_node.send_message(full_response, self.max_retries_packet, self.retransmission_timeout_packet)
         elif preamble == self.RESPONSE_IDENTIFIER:
             # Handle response to earlier message.
             # Find the earlier message.
             try:
                 with self.lock:
                     receive_event: threading.Event = self.waiting_messages[id]
-                    self.unhandled_responses[id] = payload[self.HEADER_LENGTH:]
+                    self.unhandled_responses[id] = (payload[self.HEADER_LENGTH:], message_tuple[1])
                     receive_event.set()
             except IndexError:
                 print("⚠️ WARNING: Received a response to a message that was either not sent or has already received a response. Dropping message.")
