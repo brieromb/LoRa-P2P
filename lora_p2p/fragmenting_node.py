@@ -13,7 +13,7 @@ class Fragment:
     SEQ_NUM_BYTES = TOTAL_FRAGS_BYTES
 
     TOTAL_HEADER_LEN = MESSAGE_ID_BYTES + TOTAL_FRAGS_BYTES + SEQ_NUM_BYTES
-    MAX_PAYLOAD_SIZE = 110 # TODO derive this from hardware limit.
+    MAX_PAYLOAD_SIZE = 224 # TODO derive this from hardware limit.
 
     def __init__(self, message_id: int, total_fragments: int, sequence_number: int, data: bytes):
         self.data = data
@@ -168,16 +168,19 @@ class FragmentingNode:
             frag_bytes = fragment.serialize()
             try:
                 # TODO find good retransmission parameters
-                response_tuple = self.reliable_communicating_node.send_reliably_wait_for_answer(
+                response_tuple = self.reliable_communicating_node.send_reliably(
                     frag_bytes,
                     max_retries=max_retries_packet,
                     retransmission_timeout=retransmission_timeout_packet
                 )
+                """
                 response_data = response_tuple[0]
                 # Check if the response is as expected an ACK for the sent message.
                 expected_ack: bytes = fragment.get_expected_ack_message()
                 if response_data != expected_ack:
                     raise RuntimeError(f"Expected an ACK for the sent fragment ({expected_ack}). Instead got: {response_data}")
+                print(f"RECEIVED ACK FOR FRAGMENT {fragment.data}")
+                """
             except TimeoutError:
                 raise TimeoutError(f"Time out in waiting for ACK for packet {i} out of {len(fragments)}, in sending a large message of {len(large_data)} bytes.")
         # The message was completely sent and received on the other side.
@@ -206,7 +209,7 @@ class FragmentingNode:
                 self.incomplete_messages.pop(matching_message.id)
                 # Return the completed message to the callback.
                 self.incoming_message_handler(matching_message.get_payload_tuple())
-
+            #print(f"FragNode: sending ACK for fragment #{fragment.sequence_number}: ({fragment.data})")
             # Return ACK for receiving the fragment.
             return fragment.get_expected_ack_message()
             

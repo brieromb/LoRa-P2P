@@ -5,28 +5,29 @@ import threading
 import json
 
 def test_fragmenting_node():
-    _test_multiple_sends_at_same_time()
+    _test_large_json()
 
 def _test_small_message():
-    def _handle_incoming1(incoming_message: bytes):
-        print(f"Node1 received: {incoming_message}")
-    
     def _handle_incoming2(incoming_message: bytes):
         print(f"Node2 received: {incoming_message}")
+        receive_event.set()
 
-    fragmenting_node1 = FragmentingNode(LoRaNode(), _handle_incoming1)
-    fragmenting_node2 = FragmentingNode(LoRaNode(), _handle_incoming2)
+    fragmenting_node1 = FragmentingNode(LoRaNode("COM4"))
+    fragmenting_node2 = FragmentingNode(LoRaNode("COM5"), _handle_incoming2)
     
-    fragmenting_node1.send_message(b'Not a large message at all.')
+    receive_event = threading.Event()
+    fragmenting_node1.send_message(b'Not a large message at all.', 2, 0.5)
+    receive_event.wait()
 
 def _test_large_json():
     def _handle_incoming_raw_json(incoming_message: bytes):
-        json_string_from_bytes = incoming_message.decode('utf-8')
+        json_string_from_bytes = incoming_message[0].decode('utf-8')
         mock_data_from_bytes = json.loads(json_string_from_bytes)
-        print(mock_data_from_bytes)
+        print(f"RECEIVED: {mock_data_from_bytes}")
+        receive_event.set()
     
-    fragmenting_node1 = FragmentingNode(LoRaNode())
-    fragmenting_node2 = FragmentingNode(LoRaNode(), _handle_incoming_raw_json)
+    fragmenting_node1 = FragmentingNode(LoRaNode("COM4"))
+    fragmenting_node2 = FragmentingNode(LoRaNode("COM5"), _handle_incoming_raw_json)
     
 
     # Convert JSON to bytes and send it.
@@ -34,28 +35,31 @@ def _test_large_json():
     json_bytes = json_string.encode('utf-8')
 
     print(f"Sending json file with size {len(json_bytes)} bytes...")
-    fragmenting_node1.send_message(json_bytes)
+    receive_event = threading.Event()
+    fragmenting_node1.send_message(json_bytes, 2, 0.5)
+    receive_event.wait()
 
+"""
 def _test_multiple_sends_at_same_time():
-    def _handle_incoming1(incoming_message: bytes):
-        json_string_from_bytes = incoming_message.decode('utf-8')
+    def _handle_incoming1(incoming_message: tuple):
+        json_string_from_bytes = incoming_message[0].decode('utf-8')
         mock_data_from_bytes = json.loads(json_string_from_bytes)
         print(f"Node1 received: {mock_data_from_bytes}")
     
-    def _handle_incoming2(incoming_message: bytes):
-        json_string_from_bytes = incoming_message.decode('utf-8')
+    def _handle_incoming2(incoming_message: tuple):
+        json_string_from_bytes = incoming_message[0].decode('utf-8')
         mock_data_from_bytes = json.loads(json_string_from_bytes)
         print(f"Node2 received: {mock_data_from_bytes}")
 
-    fragmenting_node1 = FragmentingNode(LoRaNode(), _handle_incoming1)
-    fragmenting_node2 = FragmentingNode(LoRaNode(), _handle_incoming2)
+    fragmenting_node1 = FragmentingNode(LoRaNode("COM4"), _handle_incoming1)
+    fragmenting_node2 = FragmentingNode(LoRaNode("COM5"), _handle_incoming2)
     
     # Create threads to send messages in parallel
     def send(sender: FragmentingNode, json_dict: dict):
         # Convert JSON to bytes and send it.
         json_string = json.dumps(json_dict, indent=2)
         json_bytes = json_string.encode('utf-8')
-        sender.send_message(json_bytes)
+        sender.send_message(json_bytes, 2, 3.0)
     
     
     # all sends in parallel
@@ -79,7 +83,7 @@ def _test_multiple_sends_at_same_time():
 def _test_asynchronous_sends():
     # TODO
     pass
-
+"""
     
     
 

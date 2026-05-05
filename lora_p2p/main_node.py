@@ -58,6 +58,7 @@ class MainNode:
             # Succesfully received the message.
             # Remove this message's data from the dicts and return response.
             with self.lock:
+                #print("MainNode: Response received. Terminating send.")
                 self.waiting_messages.pop(id)
                 response = self.unhandled_responses.pop(id)
             return response

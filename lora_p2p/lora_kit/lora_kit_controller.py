@@ -3,6 +3,7 @@ import time
 
 import serial
 import string
+import threading
 
 from .synchronized import synchronized
 from .serial_helper_code.threaded_serial_reader import ThreadedSerialReader
@@ -64,6 +65,8 @@ class LoRaKitController:
 
         # Wait a bit to make sure the serial connection is properly set up before sending commands.
         time.sleep(2) 
+
+        self.lock = threading.Lock() # Lock for ensuring only a single send is done at the same time.
 
     def check_connection(self) -> bool:
         return self._write_command_and_check_response(b'AT\r\n', b'+AT: OK')
@@ -136,15 +139,15 @@ class LoRaKitController:
     def is_listening(self) -> bool:
         return not self.threaded_serial_reader.is_paused()
 
-    @synchronized
     def _write_command_and_check_response(self, command, expected_response) -> bool:
-        self.threaded_serial_reader.pause()
+        with self.lock:
+            self.threaded_serial_reader.pause()
 
-        (success, _, response) = write_with_confirm(self.ser, command, expected_response)
+            (success, _, response) = write_with_confirm(self.ser, command, expected_response)
 
-        if not success:
-            print(f"⚠️ WARNING: AT command '{command}' got unexpected response: '{response}'. Expected '{expected_response}' instead.")
-        return success
+            if not success:
+                print(f"⚠️ WARNING: AT command '{command}' got unexpected response: '{response}'. Expected '{expected_response}' instead.")
+            return success
 
 
 def test_lora_kit_controller():
