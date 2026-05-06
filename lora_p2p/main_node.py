@@ -92,7 +92,7 @@ class MainNode:
                     receive_event: threading.Event = self.waiting_messages[id]
                     self.unhandled_responses[id] = (payload[self.HEADER_LENGTH:], message_tuple[1])
                     receive_event.set()
-            except IndexError:
+            except KeyError:
                 print("⚠️ WARNING: Received a response to a message that was either not sent or has already received a response. Dropping message.")
                 return
             

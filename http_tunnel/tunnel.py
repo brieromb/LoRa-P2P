@@ -77,7 +77,7 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
             resp = requests.request(
                 method=req["method"], url=url,
                 headers=req["headers"], data=req["body"].encode(),
-                timeout=10, allow_redirects=False,
+                timeout=None, allow_redirects=False,
             )
             log.info(f"Got response: HTTP {resp.status_code}")
             return serialize_response(resp.status_code, dict(resp.headers), resp.content)

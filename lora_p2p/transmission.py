@@ -68,7 +68,7 @@ class Transmission():
         slot_time = 1.75
         k = min(self.retries + 1, 4)
         wait_time = random.randint(1, pow(2,k)) * slot_time
-        print(f"Timer #{self.retries} of {wait_time} seconds started")
+        #print(f"Timer #{self.retries} of {wait_time} seconds started")
         if self.terminated.wait(wait_time):
             print(f"ACK received on attempt #{self.retries} -> cancel retransmission")
             return
