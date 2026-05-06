@@ -63,13 +63,12 @@ class FragmentingNode:
         message_data: bytes = message_tuple[0]
         try:
             fragment: Fragment = Fragment.from_bytes(message_data)
-            fragment.save_connection_measurements(message_data[1]) # Save the measurements for receiving this fragment.
             matching_message: BigMessage
             # Find the matching incomplete message for this fragment (or create a new one if no match)
             if fragment.message_id in self.incomplete_messages:
                 # earlier fragment for this message was received.
                 matching_message = self.incomplete_messages[fragment.message_id]
-                matching_message.add_fragment(fragment)
+                matching_message.add_fragment(fragment, message_tuple[1])
             else:
                 # This is the first fragment received for this message. This fragment starts a new message reconstruction.
                 matching_message: BigMessage = BigMessage([fragment])

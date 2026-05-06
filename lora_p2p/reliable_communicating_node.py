@@ -78,7 +78,8 @@ class ReliableCommunicatingNode:
             self._handle_next_in_send_queue()
             raise TimeoutError("Connection timed out: The number of max retransmissions was reached, without receiving a reply.")
         else: # The transmission was successful. Return the reply
-            return transmission.get_response().as_tuple()
+            resp: ReceivedResponse = transmission.get_response()
+            return resp.as_tuple()
     
     def _handle_next_in_send_queue(self):
         if not self.send_queue.empty():

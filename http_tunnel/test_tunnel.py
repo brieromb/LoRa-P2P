@@ -40,6 +40,46 @@ PORT_TUNNEL_B = 8002   # Server talks to this (fake Robot API)
 PORT_SERVER   = 8001   # Real server
 
 
+LARGE_TEST_JSON = {
+        "users": [
+            {
+                "id": 1,
+                "name": "John Doe",
+                "email": "john@example.com",
+                "is_active": True,
+                "age": 30,
+                "preferences": {
+                    "theme": "dark",
+                    "notifications": False
+                }
+            },
+            {
+                "id": 2,
+                "name": "Jane Smith",
+                "email": "jane@example.com",
+                "is_active": False,
+                "age": 25,
+                "preferences": {
+                    "theme": "light",
+                    "notifications": True
+                }
+            },
+            {
+                "id": 3,
+                "name": "Rick Sanchez",
+                "email": "rick@example.com",
+                "is_active": True,
+                "age": 78,
+                "preferences": {
+                    "theme": "light",
+                    "notifications": True
+                }
+            }
+        ],
+        "total_users": 3,
+        "version": "1.0.0"
+    }
+
 # ── Fake Server ───────────────────────────────────────────────────────────────
 
 def make_server_app() -> FastAPI:
@@ -63,6 +103,10 @@ def make_server_app() -> FastAPI:
     @server.get("/robot/command")
     async def robot_command():
         return {"command": "move_forward", "speed": 1.5}
+    
+    @server.get("/large_json")
+    async def large_json():
+        return LARGE_TEST_JSON
 
     return server
 
@@ -98,44 +142,50 @@ def run_tests():
             results.append((name, False))
 
     base_a = f"http://127.0.0.1:{PORT_TUNNEL_A}"
+    time_out_per_req = None
 
     def t_get_status():
-        r = requests.get(f"{base_a}/status", timeout=5)
+        r = requests.get(f"{base_a}/status", timeout=time_out_per_req)
         assert r.status_code == 200
         assert r.json()["status"] == "ok"
 
     def t_post_errors():
         payload = {"errors": ["sensor_fault", "low_battery"]}
-        r = requests.post(f"{base_a}/robot/errors", json=payload, timeout=5)
+        r = requests.post(f"{base_a}/robot/errors", json=payload, timeout=time_out_per_req)
         assert r.status_code == 200
         body = r.json()
         assert body["received"] is True
         assert "sensor_fault" in body["errors"]
 
     def t_post_telemetry():
-        r = requests.post(f"{base_a}/robot/telemetry", json={"readings": [1.1, 2.2, 3.3]}, timeout=5)
+        r = requests.post(f"{base_a}/robot/telemetry", json={"readings": [1.1, 2.2, 3.3]}, timeout=time_out_per_req)
         assert r.status_code == 200
         assert r.json()["data_points"] == 3
 
     def t_query_string():
-        r = requests.get(f"{base_a}/status?verbose=true", timeout=5)
+        r = requests.get(f"{base_a}/status?verbose=true", timeout=time_out_per_req)
         assert r.status_code == 200
 
     def t_unknown_route():
-        r = requests.get(f"{base_a}/does/not/exist", timeout=5)
+        r = requests.get(f"{base_a}/does/not/exist", timeout=time_out_per_req)
         assert r.status_code == 404
 
     def t_get_connectivity():
-        r = requests.get(f"{base_a}/connectivity", timeout=5)
+        r = requests.get(f"{base_a}/connectivity", timeout=time_out_per_req)
         assert r.status_code == 200
-        assert r.json().keys() == {"rssi", "snr"}
-
+        assert r.json().keys() == {"rssis", "snrs", "times"}
+    
+    def t_large_json():
+        r = requests.get(f"{base_a}/large_json", timeout=time_out_per_req)
+        assert r.json() == LARGE_TEST_JSON
+    
     test("GET  /status                 (Robot → Server)", t_get_status)
     test("POST /robot/errors           (Robot → Server)", t_post_errors)
     test("POST /robot/telemetry        (Robot → Server)", t_post_telemetry)
     test("GET  /status?verbose=true    (query string passthrough)", t_query_string)
     test("GET  /does/not/exist         (404 passthrough)", t_unknown_route)
-    test("GET  /connectivity            (Robot → Server)", t_get_connectivity)
+    test("GET  /connectivity           (Robot → Server)", t_get_connectivity)
+    test("GET /large_json              (Robot → Server)", t_large_json)
 
 
     passed = sum(1 for _, ok in results if ok)
@@ -152,8 +202,8 @@ def test():
     print("\n=== Radio HTTP Tunnel - Local Integration Test ===\n")
 
     # Two mock LoRa nodes — no port means mock, they share a MockMedium automatically
-    tunnel_a = make_app(forward_to_url=f"http://127.0.0.1:{PORT_SERVER}", node=make_lora_node(None))
-    tunnel_b = make_app(forward_to_url=f"http://127.0.0.1:{PORT_SERVER}", node=make_lora_node(None))
+    tunnel_a = make_app(forward_to_url=f"http://127.0.0.1:{PORT_SERVER}", node=make_lora_node("COM4"))
+    tunnel_b = make_app(forward_to_url=f"http://127.0.0.1:{PORT_SERVER}", node=make_lora_node("COM5"))
     server   = make_server_app()
 
     run_server(server,   PORT_SERVER,   "Server  ")

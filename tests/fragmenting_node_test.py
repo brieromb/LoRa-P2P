@@ -31,7 +31,7 @@ def _test_large_json():
     
 
     # Convert JSON to bytes and send it.
-    json_string = json.dumps(MOCK_LARGE_MESSAGE1, indent=2)
+    json_string = json.dumps(MOCK_LARGE_MESSAGE2, indent=2)
     json_bytes = json_string.encode('utf-8')
 
     print(f"Sending json file with size {len(json_bytes)} bytes...")

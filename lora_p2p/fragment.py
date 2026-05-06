@@ -17,7 +17,6 @@ class Fragment:
         self.total_fragments = total_fragments
         self.sequence_number = sequence_number
         self.payload_length = len(data)
-        self.connection_measurements = None
     
     def get_expected_ack_message(self) -> bytes:
         """ACK message for the fragment, containing the message id and sequence number."""
@@ -43,12 +42,6 @@ class Fragment:
         sequence_number = int.from_bytes(bytes_data[Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES:Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES + Fragment.SEQ_NUM_BYTES], byteorder='big')
         data = bytes_data[Fragment.MESSAGE_ID_BYTES + Fragment.TOTAL_FRAGS_BYTES + Fragment.SEQ_NUM_BYTES:]
         return Fragment(message_id, total_fragments, sequence_number, data)
-
-    def save_connection_measurements(self, measurements: ConnectionQualityMeasurements):
-        self.connection_measurements = measurements
-    
-    def get_connection_measurements(self) -> ConnectionQualityMeasurements | None:
-        return self.connection_measurements
             
 
 
@@ -74,6 +67,9 @@ class BigMessage:
         self.total_fragments = fragments[0].total_fragments
         self.id = fragments[0].message_id
 
+        # Keep the connection quality measurements for the whole transmission of this message
+        self.conn_qual_meas: ConnectionQualityMeasurements = ConnectionQualityMeasurements()
+
     @classmethod
     def from_bytes(cls, id: int, data: bytes):
         """Construct a new BigMessage by splitting the given data into fragments, and assigning them a message id and sequence numbers."""
@@ -96,7 +92,7 @@ class BigMessage:
         # Create the object and return it.
         return cls(fragments)
     
-    def add_fragment(self, fragment: Fragment) -> bool:
+    def add_fragment(self, fragment: Fragment, conn_qual_meas: ConnectionQualityMeasurements) -> bool:
         """Adds a fragment to an incomplete BigMessage. Returns whether the addition was successful."""
         # Check if the message is complete already and the fragment has the right id.
         if self.is_complete() or self.id != fragment.message_id:
@@ -107,13 +103,14 @@ class BigMessage:
                 print(f"⚠️ WARNING: Tried to add an already present fragment (sequence number #{fragment.sequence_number}) to a reconstructed BigMessage.")
                 return False
         self.fragments.append(fragment)
+        self.conn_qual_meas += conn_qual_meas # Add the connection quality measurements
         return True
 
     def is_complete(self) -> bool:
         """Whether the BigMessage has all of its frames."""
         return len(self.fragments) == self.total_fragments
     
-    def get_payload_tuple(self) -> bytes:
+    def get_payload_tuple(self) -> tuple[bytes, ConnectionQualityMeasurements]:
         """Returns the entire payload of a complete BigMessage,
         consisting of the concatenation of the contents of the in-order fragments."""
 
@@ -123,11 +120,9 @@ class BigMessage:
         # Sort the fragments based on sequence number and concatenate their contents.
         sorted_fragments = sorted(self.fragments, key=lambda obj: obj.sequence_number)
         complete_message = bytes()
-        connection_measurements: list[ConnectionQualityMeasurements] = []
         for fragment in sorted_fragments:
             complete_message += fragment.data
-            connection_measurements.append(fragment.get_connection_measurements())
-        return (complete_message, connection_measurements)
+        return (complete_message, self.conn_qual_meas)
 
     def get_fragments(self) -> list[Fragment]:
         return self.fragments

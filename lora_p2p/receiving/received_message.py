@@ -1,19 +1,50 @@
-from dataclasses import dataclass
+import time
 
-
-@dataclass
-class ConnectionQualityMeasurements:
+class ConnectionQualityMeasurements():
     """The connection quality measurements measured when receiving a single message.
     
     Params:
-        rssi: received signal strength indicator. in dBm.
-        snr: signal to noise ratio. in dB."""
+        rssis: list of received signal strength indicator. in dBm.
+        snrs: list of signal to noise ratio. in dB.
+        times: list of times at which these were measured. in seconds elapsed since the Epoch."""
 
-    rssi: int
-    snr: int
+    rssis: list[int]
+    snrs: list[int]
+    times: list[float]
+
+    def __init__(self, rssi: int | None = None, snr: int | None = None, time: float = time.time()):
+        """Creates a connectionQualityMeasurements instance. If rssi or snr are None, an empty instance is created."""
+        self.rssis = []
+        self.snrs = []
+        self.times = []
+        if rssi is not None and snr is not None:
+            self.rssis.append(rssi)
+            self.snrs.append(snr)
+            self.times.append(time)
 
     def __str__(self):
-        return f"<RSSI: {self.rssi}dBm, SNR: {self.snr}dB>"
+        s = "["
+        for i in range(len(self.rssis)):
+            s += f" <RSSI: {self.rssis[i]}dBm, SNR: {self.snrs[i]}dB>"
+        s += " ]"
+        return s
+    
+    def __iadd__(self, other):
+        """measurements += other_measuremens combines the measurements into the first object."""
+        self.rssis += other.rssis
+        self.snrs += other.snrs
+        self.times += other.times
+        return self
+    
+    def __add__(self, other):
+        pass
+    
+    def get_data(self) -> dict:
+        data_dict = dict()
+        data_dict["rssis"] = self.rssis
+        data_dict["snrs"] = self.snrs
+        data_dict["times"] = self.times
+        return data_dict
     
     def __repr__(self):
         return self.__str__()

@@ -36,7 +36,7 @@ class MockMedium:
         message_to_be_received = ReceivedMessage(
             hexpayload=hex_payload,
             message_length=packet_length,
-            conn_qual=ConnectionQualityMeasurements(None, None) # TODO mock these values too in a realistic way.
+            conn_qual=ConnectionQualityMeasurements()
         )
 
         for lora_controller in self.lora_controllers:

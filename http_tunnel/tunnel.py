@@ -90,18 +90,12 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
 
     # =============== OPTIONAL: Connectivity monitoring endpoint ===============
     # Store connectivity measurements (for monitoring/debugging)
-    connection_measurements: list[ConnectionQualityMeasurements] = list()
-    print(connection_measurements)
+    connection_measurements: ConnectionQualityMeasurements = ConnectionQualityMeasurements()
 
     @app.api_route("/connectivity", methods=["GET"])
     async def connectivity():
         """Endpoint to get connectivity measurements (rssi, snr) of the radio"""
-        rssis = []
-        snrs = []
-        for measurement in connection_measurements:
-            rssis.append(measurement.rssi)
-            snrs.append(measurement.snr)
-        return {"rssi": rssis, "snr": snrs}
+        return connection_measurements.get_data()
     
     # ==============================================================================
 
@@ -129,7 +123,7 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
             resp = deserialize_response(answer_data[0])
 
             # =============== Update connectivity measurements ===============
-            connection_measurements.extend(answer_data[1]) # Add connection quality measurements.
+            connection_measurements.__iadd__(answer_data[1]) # Add connection quality measurements.
 
             # ==============================================================================
 

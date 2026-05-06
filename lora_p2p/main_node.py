@@ -25,7 +25,7 @@ class MainNode:
         
         Args:
             lora_node: an instance of a real or mock LoRaNode.
-            incoming_message_handler: A message handler that receives incoming messages `tuple(bytes, list[ConnectionQualityMeasurements])` and returns a response to them.
+            incoming_message_handler: A message handler that receives incoming messages `tuple(bytes, ConnectionQualityMeasurements)` and returns a response to them.
             max_retries_packet:
             retransmission_timeout_packet"""
 
@@ -37,10 +37,10 @@ class MainNode:
         self.retransmission_timeout_packet = retransmission_timeout_packet
 
         self.waiting_messages : dict[bytes, threading.Event] = dict() # Receive events for all waiting messages.
-        self.unhandled_responses : dict[bytes, tuple[bytes, list[ConnectionQualityMeasurements]]] = dict() # Unhandled responses for messages.
+        self.unhandled_responses : dict[bytes, tuple[bytes, ConnectionQualityMeasurements]] = dict() # Unhandled responses for messages.
         self.lock = threading.Lock() # Lock for the dict objects.
     
-    def send_and_wait(self, payload: bytes) -> tuple[bytes, list[ConnectionQualityMeasurements]]:
+    def send_and_wait(self, payload: bytes) -> tuple[bytes, ConnectionQualityMeasurements]:
         """Sends some message in bytes. Waits for and returns the response.
         If one of the packets could not arrive, a TimeourError is thrown."""
         with self.lock:
@@ -66,7 +66,7 @@ class MainNode:
             raise TimeoutError("Timer ran out before receiving the response.")
 
     
-    def _handle_random_incoming_message(self, message_tuple: tuple[bytes, list[ConnectionQualityMeasurements]]) -> None:
+    def _handle_random_incoming_message(self, message_tuple: tuple[bytes, ConnectionQualityMeasurements]) -> None:
         """Callback that handles all incoming messages.
         It handles both new messages and responses to earlier sent messages.
         This method can distinguish the two cases and act accordingly."""
