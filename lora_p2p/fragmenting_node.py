@@ -32,7 +32,7 @@ class FragmentingNode:
         big_message = BigMessage.from_bytes(id_, large_data)
         fragments: list[Fragment] = big_message.get_fragments()
 
-        print(f"FragNode {id(self)}: Sending {len(fragments)} packets for message {large_data}")
+        #print(f"FragNode {id(self)}: Sending {len(fragments)} packets for message {large_data}")
 
         # Send all fragments one by one for now. For simplicity.
         for (i, fragment) in enumerate(fragments):
@@ -76,7 +76,7 @@ class FragmentingNode:
                 self.incomplete_messages[matching_message.id] = matching_message
 
             if matching_message.is_complete():
-                print(f"FragNode {id(self)}: message complete with payload: {matching_message.get_payload_tuple()}")
+                #print(f"FragNode {id(self)}: message complete with payload: {matching_message.get_payload_tuple()}")
                 # Remove the message from the incompleted messages.
                 self.incomplete_messages.pop(matching_message.id)
                 # Return the completed message to the callback.
@@ -85,7 +85,7 @@ class FragmentingNode:
                     args=(matching_message.get_payload_tuple(),)
                 )
                 message_handler_thread.start()
-            print(f"FragNode {id(self)}: sending ACK for fragment #{fragment.sequence_number}: ({fragment.data})")
+            #print(f"FragNode {id(self)}: sending ACK for fragment #{fragment.sequence_number}: ({fragment.data})")
             # Return ACK for receiving the fragment.
             return fragment.get_expected_ack_message()
             

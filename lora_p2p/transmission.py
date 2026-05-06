@@ -70,7 +70,7 @@ class Transmission():
         wait_time = random.randint(1, pow(2,k)) * slot_time
         #print(f"Timer #{self.retries} of {wait_time} seconds started")
         if self.terminated.wait(wait_time):
-            print(f"ACK received on attempt #{self.retries} -> cancel retransmission")
+            #print(f"ACK received on attempt #{self.retries} -> cancel retransmission")
             return
 
         # Timeout occurred. mark as failed if we have reached the max retries.
@@ -79,7 +79,7 @@ class Transmission():
             print("Max retries reached -> marking transmission as failed")
             self._mark_unsuccessful()
         else:
-            print(f"Timeout on attempt #{self.retries} -> retransmitting")
+            print(f"RETRANSMITTING due to timeout after {wait_time}s on attempt #{self.retries}")
             retransmit_callback()
     
     def is_finished(self) -> bool:
