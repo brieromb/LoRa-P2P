@@ -4,6 +4,7 @@ from .lora_node import LoRaNode
 from .fragment import Fragment, BigMessage
 
 import random
+import threading
 
 class FragmentingNode:
     def __init__(
@@ -79,7 +80,11 @@ class FragmentingNode:
                 # Remove the message from the incompleted messages.
                 self.incomplete_messages.pop(matching_message.id)
                 # Return the completed message to the callback.
-                self.incoming_message_handler(matching_message.get_payload_tuple()) # HIER ZIT HET PROBLEEM! Dit wordt geroepen voor de return, wat de response hogere prioriteit geeft dan de ACK.
+                message_handler_thread = threading.Thread( # DOING THIS IN A THREAD FIXES OTHERWISE REPLIES BEING SENT BEFORE ACKS.
+                    target=self.incoming_message_handler,
+                    args=(matching_message.get_payload_tuple(),)
+                )
+                message_handler_thread.start()
             print(f"FragNode {id(self)}: sending ACK for fragment #{fragment.sequence_number}: ({fragment.data})")
             # Return ACK for receiving the fragment.
             return fragment.get_expected_ack_message()
