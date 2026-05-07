@@ -1,3 +1,5 @@
+import threading
+
 import serial
 
 from .lora_kit.lora_kit_controller import LoRaKitController, CommunicationParameters
@@ -34,15 +36,17 @@ class LoRaNode:
         self.lora_controller.set_communication_parameters(communication_params)
         self.lora_controller.enable_listening()
 
+        self.lock = threading.Lock() # Send lock
+
     def set_on_received_callback(self, callback) -> None:
         self.on_received_callback = callback
 
     def send(self, data: bytes):
         """Sends a message, which disables listening.
         Resumes listening after finishing sending"""
-
-        self.lora_controller.send_message(data) # Send the message, which disables listening.
-        self.lora_controller.enable_listening() # Resume listening after sending
+        with self.lock:
+            self.lora_controller.send_message(data) # Send the message, which disables listening.
+            self.lora_controller.enable_listening() # Resume listening after sending
 
     def receive(self, message: ReceivedMessage):
         """Handles receiving a message. This should only be called when the node is in listening mode."""

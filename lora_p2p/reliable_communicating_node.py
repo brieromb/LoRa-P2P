@@ -1,4 +1,5 @@
 import threading
+import time
 from queue import Queue
 
 from .receiving.received_message import ConnectionQualityMeasurements
@@ -35,7 +36,11 @@ class ReliableCommunicatingNode:
 
         self.current_transmission : Transmission = None # The transmission that is currently being sent/waiting for ACK
 
-    def send_reliably(self, data: bytes, max_retries: int = 3, retransmission_timeout: float = 5.0):
+        self.last_received_time : float | None = time.time() # Save last time some message got received to detect collisions.
+
+        self.send_lock = threading.Lock()
+
+    def send_reliably(self, data: bytes, max_retries: int = 2, retransmission_timeout: float = 2.0):
         """Sends a message using best effort, but non-blocking.
         If no response is sent within the retransmission timeout,
         it will retry until the number of max retries is reached."""
@@ -45,7 +50,7 @@ class ReliableCommunicatingNode:
         self.send_queue.put(transmission)
 
         # If there is no current transmission being sent, start handling the next one in the queue
-        if self.current_transmission is None:
+        if self.current_transmission is None or self.current_transmission.is_finished():
             self._handle_next_in_send_queue()
         else:
             print("Currently busy sending another message, adding to send queue")
@@ -60,7 +65,7 @@ class ReliableCommunicatingNode:
         self.send_queue.put(transmission)
 
         # If there is no current transmission being sent, start handling the next one in the queue
-        if self.current_transmission is None:
+        if self.current_transmission is None or self.current_transmission.is_finished():
             self._handle_next_in_send_queue()
         else:
             print("Currently busy sending another message, adding to send queue")
@@ -70,33 +75,36 @@ class ReliableCommunicatingNode:
         if transmission.state == TransmissionState.FAILED:
             # First clear the transmission and send the next message in queue before throwing an error.
             # Else the queue would become blocked.
-            self.current_transmission = None
             self._handle_next_in_send_queue()
             raise TimeoutError("Connection timed out: The number of max retransmissions was reached, without receiving a reply.")
         else: # The transmission was successful. Return the reply
-            return transmission.get_response().as_tuple()
+            resp: ReceivedResponse = transmission.get_response()
+            return resp.as_tuple()
     
     def _handle_next_in_send_queue(self):
         if not self.send_queue.empty():
+            #print(f"SEND QUEUE: {self.send_queue.qsize()}")
             next_transmission = self.send_queue.get()
             self.current_transmission = next_transmission
             self._transmit_current()
     
     def _transmit_current(self):
-        transmission = self.current_transmission
-        self.lora_node.send(transmission.send_data)
-        # Start the retransmission timer in a separate thread so that we can wait for the ACK without blocking the main thread.
-        # If the timer expires before an ACK is received, it will trigger a retransmission if the max retries has not been reached.
-        timer_thread = threading.Thread(
-            target=transmission.retransmission_timer,
-            args=(self._transmit_current,))
-        timer_thread.start()
+        with self.send_lock:
+            transmission = self.current_transmission
+            self.lora_node.send(transmission.send_data)
+            # Start the retransmission timer in a separate thread so that we can wait for the ACK without blocking the main thread.
+            # If the timer expires before an ACK is received, it will trigger a retransmission if the max retries has not been reached.
+            timer_thread = threading.Thread(
+                target=transmission.retransmission_timer,
+                args=(self.last_received_time, self._transmit_current,))
+            timer_thread.start()
 
     def _on_receive(self, message: ReceivedMessage):
         """Processes received messages.
         Checks if they are responses to a previously sent message or if they are new messages.
         In the latter case the function will respond back using the incoming_message_handler.
         Also prints appropriate warnings when unexpected cases occur."""
+        self.last_received_time = time.time() # Update last receive time
 
         # Process the received message and send an acknowledgement back to the sender
         if message.has_payload():
@@ -104,17 +112,19 @@ class ReliableCommunicatingNode:
                 response = ReceivedResponse(message)
                 if response.finishes_transmission(self.current_transmission):
                     self.current_transmission.mark_acknowledged(response)
-                    self.current_transmission = None # Clear the current transmission before handling the next one in the queue
+                    #print("MARKED AS ACKNOWLEDGED")
                     self._handle_next_in_send_queue()
                 else:
                     print(f"⚠️ WARNING: received response to an unknown message with digest: {response.get_original_message_digest()}. Expected a response for {self.current_transmission.get_send_data()}")
 
             except ValueError: # The message could not be interpreted as a response.
                 # So it must be an original new message that needs a response from this node.
-                answer: bytes = self.incoming_message_handler(message.as_tuple())
-                # Send a response back to the sender
-                resp = ResponsePayload(response_for=message, response_contents=answer)
-                # Just send, without expecting a reply to this reply
-                self.lora_node.send(resp.as_bytes())
+                with self.send_lock:
+                    answer: bytes = self.incoming_message_handler(message.as_tuple())
+                    # Send a response back to the sender
+                    resp = ResponsePayload(response_for=message, response_contents=answer)
+                    # Just send, without expecting a reply to this reply
+                    #print("RelComNode: sending ACK")
+                    self.lora_node.send(resp.as_bytes())
         else: 
             print(f"⚠️ WARNING: received message without payload: {message}")

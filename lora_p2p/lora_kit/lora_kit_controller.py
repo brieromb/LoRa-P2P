@@ -3,6 +3,7 @@ import time
 
 import serial
 import string
+import threading
 
 from .synchronized import synchronized
 from .serial_helper_code.threaded_serial_reader import ThreadedSerialReader
@@ -44,6 +45,9 @@ class LoRaKitController:
     """Class that provides a high level interface for sending AT commands to a LoRa module
     over a serial connection, using pyserial."""
 
+    # hardware limit - command overhead
+    MAX_MESSAGE_BYTES = 528 - len('AT+TEST=TXLRPKT, ""\r\n')
+
     def __init__(self, ser: serial.Serial, received_message_handler=lambda x: print(x)):
 
         self.ser = ser
@@ -61,6 +65,8 @@ class LoRaKitController:
 
         # Wait a bit to make sure the serial connection is properly set up before sending commands.
         time.sleep(2) 
+
+        self.lock = threading.Lock() # Lock for ensuring only a single send is done at the same time.
 
     def check_connection(self) -> bool:
         return self._write_command_and_check_response(b'AT\r\n', b'+AT: OK')
@@ -114,12 +120,11 @@ class LoRaKitController:
         
         # letters to upper case, because the received response always is received in upper case
         hex_message = hex_message.upper()
+
+        if len(hex_message) > self.MAX_MESSAGE_BYTES * 2: # Each byte is represented by 2 hex characters
+            raise BufferError(f"The size of the message ({len(payload)} bytes) exceeds the hardware limit of {self.MAX_MESSAGE_BYTES} bytes. Decrease the send payload.")
         
         command = (f'AT+TEST=TXLRPKT, "{hex_message}"\r\n').encode()
-        
-        # Before actually sending, check if the command is too large (> 528 bytes)
-        if len(command) > 528:
-            raise BufferError(f"The size of the AT command ({len(command)} bytes) exceeds the hardware limit of 528 bytes. Decrease the send payload.")
         
         response = (f'+TEST: TXLRPKT "{hex_message}"\r\n+TEST: TX DONE').encode()
     
@@ -134,15 +139,15 @@ class LoRaKitController:
     def is_listening(self) -> bool:
         return not self.threaded_serial_reader.is_paused()
 
-    @synchronized
     def _write_command_and_check_response(self, command, expected_response) -> bool:
-        self.threaded_serial_reader.pause()
+        with self.lock:
+            self.threaded_serial_reader.pause()
 
-        (success, _, response) = write_with_confirm(self.ser, command, expected_response)
+            (success, _, response) = write_with_confirm(self.ser, command, expected_response)
 
-        if not success:
-            print(f"⚠️ WARNING: AT command '{command}' got unexpected response: '{response}'. Expected '{expected_response}' instead.")
-        return success
+            if not success:
+                print(f"⚠️ WARNING: AT command '{command}' got unexpected response: '{response}'. Expected '{expected_response}' instead.")
+            return success
 
 
 def test_lora_kit_controller():

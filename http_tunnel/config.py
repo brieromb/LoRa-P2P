@@ -3,9 +3,9 @@
 # ======== RADIO SETTINGS ========
 # The serial port of the LoRa module. Check your system's device manager to find the correct port.
 RADIO_PORT         = "COM4"
-# The maximum number of times the LoRa module will retransmit a message if no acknowledgement is received.
+# The maximum number of times the LoRa module will retransmit a packet if no acknowledgement is received.
 RETRIES            = 3
-# The timeout between (re)transmissions over the radio channel in seconds.
+# The timeout between (re)transmissions of a packet over the radio channel in seconds.
 RETRANSMIT_TIMEOUT = 2.0
 
 # ======== TUNNEL SETTINGS ========

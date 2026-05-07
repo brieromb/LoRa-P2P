@@ -13,7 +13,7 @@ import logging
 import requests
 
 from fastapi import FastAPI, Request, Response
-from lora_p2p import LoRaNode, ReliableCommunicatingNode
+from lora_p2p import LoRaNode, MainNode, ConnectionQualityMeasurements
 from .config import RETRIES, RETRANSMIT_TIMEOUT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -64,7 +64,7 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
     Args:
         forward_to_url: Base URL to forward inbound radio requests to.
         node:           A LoRaNode instance (real or mock). make_app() wraps it
-                        in a ReliableCommunicatingNode internally.
+                        in a MainNode internally.
     """
 
     def on_radio_request(message_data: tuple) -> bytes:
@@ -77,7 +77,7 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
             resp = requests.request(
                 method=req["method"], url=url,
                 headers=req["headers"], data=req["body"].encode(),
-                timeout=10, allow_redirects=False,
+                timeout=None, allow_redirects=False,
             )
             log.info(f"Got response: HTTP {resp.status_code}")
             return serialize_response(resp.status_code, dict(resp.headers), resp.content)
@@ -85,18 +85,17 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
             log.error(f"Failed to forward request: {e}")
             return json.dumps({"status": 502, "headers": {}, "body": f"Tunnel error: {e}"}).encode()
 
-    radio = ReliableCommunicatingNode(node, on_radio_request)
+    radio = MainNode(node, on_radio_request, RETRIES, RETRANSMIT_TIMEOUT)
     app   = FastAPI(title="Radio HTTP Tunnel")
 
     # =============== OPTIONAL: Connectivity monitoring endpoint ===============
-    # Store latest connectivity measurements (for monitoring/debugging)
-    rssi: int | None = None
-    snr:  int | None = None
+    # Store connectivity measurements (for monitoring/debugging)
+    connection_measurements: ConnectionQualityMeasurements = ConnectionQualityMeasurements()
 
     @app.api_route("/connectivity", methods=["GET"])
     async def connectivity():
         """Endpoint to get connectivity measurements (rssi, snr) of the radio"""
-        return {"rssi": rssi, "snr": snr}
+        return connection_measurements.get_data()
     
     # ==============================================================================
 
@@ -119,16 +118,13 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
         """
         try:
             answer_data = await asyncio.to_thread(
-                radio.send_reliably_wait_for_answer, packet,
-                max_retries=RETRIES, retransmission_timeout=RETRANSMIT_TIMEOUT,
+                radio.send_and_wait, packet,
             )
             resp = deserialize_response(answer_data[0])
 
             # =============== Update connectivity measurements ===============
-            connectivity_measurements = answer_data[1]
-            global rssi, snr
-            rssi = connectivity_measurements.rssi
-            snr  = connectivity_measurements.snr
+            connection_measurements.__iadd__(answer_data[1]) # Add connection quality measurements.
+
             # ==============================================================================
 
             log.info(f"Returning HTTP {resp['status']} to caller")

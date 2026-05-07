@@ -27,13 +27,16 @@ class MockMedium:
         if len(hex_payload) % 2 == 1:
             hex_payload = "0" + hex_payload
             packet_length += 1
-        packet_length /= 2 # Packet length is always the hex string length / 2
+        packet_length *= 2 # Packet length in bytes is always the hex string length * 2
+
+        #if packet_length > MockLoRaKitController.MAX_MESSAGE_BYTES:
+        #    raise BufferError(f"The size of the message ({packet_length} bytes) exceeds the hardware limit of {MockLoRaKitController.MAX_MESSAGE_BYTES} bytes. Decrease the send payload.")
 
         # Construct a received message.
         message_to_be_received = ReceivedMessage(
             hexpayload=hex_payload,
             message_length=packet_length,
-            conn_qual=ConnectionQualityMeasurements(None, None) # TODO mock these values too in a realistic way.
+            conn_qual=ConnectionQualityMeasurements()
         )
 
         for lora_controller in self.lora_controllers:
@@ -70,41 +73,46 @@ class MockLoRaKitController(LoRaKitController):
         self.listening : bool = False
         self.received_message_handler = received_message_handler
         self.medium.join(self)
+        self.lock = threading.Lock()
 
     @override
     def check_connection(self) -> bool:
-        return True
+        with self.lock:
+            return True
 
     @override
     def enable_test_mode(self) -> bool:
-        self.test_mode_enabled = True
+        with self.lock:
+            self.test_mode_enabled = True
 
     @override
     def set_communication_parameters(self, params: CommunicationParameters) -> bool:
     
         """The effect of setting the communication parameters isn't mocked.
         Mocked nodes can always communicate with each other, no matter what is configured here."""
-        return True
+        with self.lock:
+            return True
 
     @override
     def enable_listening(self) -> bool:
         """Enables listening. Can only do this in TEST mode."""
-
-        if not self.test_mode_enabled:
-            raise RuntimeError("TEST mode should be enabled before trying to listen.")
-        self.listening = True
+        with self.lock:
+            if not self.test_mode_enabled:
+                raise RuntimeError("TEST mode should be enabled before trying to listen.")
+            self.listening = True
 
     @override
     def send_message(self, payload: bytes):
         """Sends a message over the medium. This action disables listening, and can only be done in TEST mode."""
-        self.listening = False
-        # Broadcast the message in a separate thread, so that it doesn't block the main one
-        # It doesn't block either when sending over LoRa.
-        messenger_thread = threading.Thread(
-            target=self.medium.broadcast,
-            args=(self, payload,)
-        )
-        messenger_thread.start()
+        with self.lock:
+            self.listening = False
+            # Broadcast the message in a separate thread, so that it doesn't block the main one
+            # It doesn't block either when sending over LoRa.
+            messenger_thread = threading.Thread(
+                target=self.medium.broadcast,
+                args=(self, payload,)
+            )
+            messenger_thread.start()
 
     @override
     def handle_incoming_message_line(self, line):
@@ -119,7 +127,8 @@ class MockLoRaKitController(LoRaKitController):
 
     @override
     def is_listening(self) -> bool:
-        return self.listening
+        with self.lock:
+            return self.listening
 
 if __name__ == '__main__':
     lora_controller = MockLoRaKitController()
