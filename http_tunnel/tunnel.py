@@ -13,6 +13,7 @@ import logging
 import requests
 
 from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from lora_p2p import LoRaNode, MainNode, ConnectionQualityMeasurements
 from .config import RETRIES, RETRANSMIT_TIMEOUT
 
@@ -88,6 +89,14 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
     radio = MainNode(node, on_radio_request, RETRIES, RETRANSMIT_TIMEOUT)
     app   = FastAPI(title="Radio HTTP Tunnel")
 
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     # =============== OPTIONAL: Connectivity monitoring endpoint ===============
     # Store connectivity measurements (for monitoring/debugging)
     connection_measurements: ConnectionQualityMeasurements = ConnectionQualityMeasurements()
@@ -99,6 +108,10 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
     
     # ==============================================================================
 
+    # Add this near the top of your file, alongside other shared state
+    _pending_gets: dict[str, asyncio.Future] = {}
+    _pending_gets_lock = asyncio.Lock()
+
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
     async def tunnel_request(path: str, request: Request):
         body      = await request.body()
@@ -107,33 +120,66 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
             full_path += "?" + request.url.query
 
         log.info(f"Tunnelling {request.method} {full_path} over radio")
-        skip    = {"host", "content-length", "transfer-encoding", "connection"}
-        #headers = {k: v for k, v in request.headers.items() if k.lower() not in skip}
-        headers = {}
-        packet  = serialize_request(request.method, full_path, headers, body)
-        """
-        # DEBUG
-        for k, v in headers.items():
-            print(f"  {k}: {v}")
-        """
+
+        # ── GET deduplication ──────────────────────────────────────────────────────
+        if request.method == "GET":
+            async with _pending_gets_lock:
+                if full_path in _pending_gets:
+                    # A GET for this endpoint is already in-flight; wait for its result.
+                    log.info(f"Deduplicating GET {full_path} – waiting for in-flight request")
+                    future = _pending_gets[full_path]
+
+                else:
+                    # First GET for this endpoint; we'll be the one to actually send it.
+                    future = asyncio.get_event_loop().create_future()
+                    _pending_gets[full_path] = future
+                    future = None  # Signal that we are the sender
+
+            if future is not None:
+                # We are a waiter – block until the sender resolves the future.
+                return await future
+
+        # ── Send over radio ────────────────────────────────────────────────────────
+        packet = serialize_request(request.method, full_path, request.headers, body)
+
         try:
             answer_data = await asyncio.to_thread(
                 radio.send_and_wait, packet,
             )
             resp = deserialize_response(answer_data[0])
 
-            # =============== Update connectivity measurements ===============
-            connection_measurements.__iadd__(answer_data[1]) # Add connection quality measurements.
-
-            # ==============================================================================
+            connection_measurements.__iadd__(answer_data[1])
 
             log.info(f"Returning HTTP {resp['status']} to caller")
-            return Response(content=resp["body"].encode(), status_code=resp["status"], headers=resp["headers"])
+            response = Response(
+                content=resp["body"].encode(),
+                status_code=resp["status"],
+                headers=resp["headers"],
+            )
+
+            # Resolve all waiters with this response.
+            if request.method == "GET":
+                async with _pending_gets_lock:
+                    fut = _pending_gets.pop(full_path, None)
+                if fut and not fut.done():
+                    fut.set_result(response)
+
+            return response
+
         except TimeoutError:
             log.warning("No response from other side over radio")
-            return Response(content="Radio timeout", status_code=504)
+            response = Response(content="Radio timeout", status_code=504)
         except Exception as e:
             log.error(f"Tunnel error: {e}")
-            return Response(content=f"Tunnel error: {e}", status_code=502)
+            response = Response(content=f"Tunnel error: {e}", status_code=502)
+
+        # ── Error path: also resolve waiters so they don't hang ───────────────────
+        if request.method == "GET":
+            async with _pending_gets_lock:
+                fut = _pending_gets.pop(full_path, None)
+            if fut and not fut.done():
+                fut.set_result(response)
+
+        return response
 
     return app
