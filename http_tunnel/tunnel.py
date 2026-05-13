@@ -146,7 +146,6 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
                 radio.send_and_wait, packet,
             )
             resp = deserialize_response(answer_data[0])
-            print("Answer:", answer_data)
             
             nonlocal connection_measurements
             connection_measurements += answer_data[1]
