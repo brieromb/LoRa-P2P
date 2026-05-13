@@ -71,7 +71,7 @@ class FragmentingNode:
                 matching_message.add_fragment(fragment, message_tuple[1])
             else:
                 # This is the first fragment received for this message. This fragment starts a new message reconstruction.
-                matching_message: BigMessage = BigMessage([fragment])
+                matching_message: BigMessage = BigMessage([fragment], message_tuple[1])
                 self.incomplete_messages[matching_message.id] = matching_message
 
             if matching_message.is_complete():

@@ -119,14 +119,12 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
         if request.url.query:
             full_path += "?" + request.url.query
 
-        log.info(f"Tunnelling {request.method} {full_path} over radio")
-
         # ── GET deduplication ──────────────────────────────────────────────────────
         if request.method == "GET":
             async with _pending_gets_lock:
                 if full_path in _pending_gets:
                     # A GET for this endpoint is already in-flight; wait for its result.
-                    log.info(f"Deduplicating GET {full_path} – waiting for in-flight request")
+                    log.info(f"Deduplicating GET {full_path}. Waiting for in-flight request")
                     future = _pending_gets[full_path]
 
                 else:
@@ -140,6 +138,7 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
                 return await future
 
         # ── Send over radio ────────────────────────────────────────────────────────
+        log.info(f"Tunnelling {request.method} {full_path} over radio")
         packet = serialize_request(request.method, full_path, request.headers, body)
 
         try:
@@ -147,8 +146,10 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
                 radio.send_and_wait, packet,
             )
             resp = deserialize_response(answer_data[0])
-
-            connection_measurements.__iadd__(answer_data[1])
+            print("Answer:", answer_data)
+            
+            nonlocal connection_measurements
+            connection_measurements += answer_data[1]
 
             log.info(f"Returning HTTP {resp['status']} to caller")
             response = Response(
