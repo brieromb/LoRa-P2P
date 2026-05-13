@@ -58,17 +58,20 @@ class BigMessage:
     MAX_AMOUNT_FRAGMENTS = 8**Fragment.TOTAL_FRAGS_BYTES - 1 # Max representable id in the fragment header.
     MAX_ID = 8**Fragment.MESSAGE_ID_BYTES - 1
 
-    def __init__(self, fragments: list[Fragment]):
+    def __init__(self, fragments: list[Fragment], conn_qual_meas: ConnectionQualityMeasurements = ConnectionQualityMeasurements()):
         """Construct an incomplete BigMessage using Fragments.
         This constructor assumes all fragments have the same message id and no duplicates are in the list."""
 
         assert len(fragments) > 0, "Need at least one fragment to start constructing a BigMessage."
-        self.fragments = fragments
+        self.fragments = []
         self.total_fragments = fragments[0].total_fragments
         self.id = fragments[0].message_id
 
         # Keep the connection quality measurements for the whole transmission of this message
-        self.conn_qual_meas: ConnectionQualityMeasurements = ConnectionQualityMeasurements()
+        self.conn_qual_meas: ConnectionQualityMeasurements = conn_qual_meas
+
+        for fragment in fragments:
+            self.add_fragment(fragment)
 
     @classmethod
     def from_bytes(cls, id: int, data: bytes):
@@ -92,7 +95,7 @@ class BigMessage:
         # Create the object and return it.
         return cls(fragments)
     
-    def add_fragment(self, fragment: Fragment, conn_qual_meas: ConnectionQualityMeasurements) -> bool:
+    def add_fragment(self, fragment: Fragment, conn_qual_meas: ConnectionQualityMeasurements = ConnectionQualityMeasurements()) -> bool:
         """Adds a fragment to an incomplete BigMessage. Returns whether the addition was successful."""
         # Check if the message is complete already and the fragment has the right id.
         if self.is_complete() or self.id != fragment.message_id:
