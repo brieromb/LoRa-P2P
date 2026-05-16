@@ -2,16 +2,11 @@
 
 # ======== RADIO SETTINGS ========
 # The serial port of the LoRa module. Check your system's device manager to find the correct port.
+# Or visit https://www.pyserial.org/docs/getting-started#find-your-device for help finding it.
 RADIO_PORT         = "COM5"
-# The maximum number of times the LoRa module will retransmit a packet if no acknowledgement is received.
-RETRIES            = 3
-# The timeout between (re)transmissions of a packet over the radio channel in seconds.
-RETRANSMIT_TIMEOUT = 2.0
 
 # ======== TUNNEL SETTINGS ========
-# Local IP to bind the tunnel server to.
-TUNNEL_IP          = "localhost" 
-# The port on which the tunnel will listen for incoming HTTP requests.
+# The port on which the tunnel will listen on this device for incoming HTTP requests.
 TUNNEL_PORT        = 8000
 
 # ======== FORWARDING SETTINGS ========

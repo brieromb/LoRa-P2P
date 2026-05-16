@@ -15,7 +15,6 @@ import requests
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from lora_p2p import LoRaNode, MainNode, ConnectionQualityMeasurements
-from .config import RETRIES, RETRANSMIT_TIMEOUT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
@@ -86,7 +85,7 @@ def make_app(forward_to_url: str, node: LoRaNode) -> FastAPI:
             log.error(f"Failed to forward request: {e}")
             return json.dumps({"status": 502, "headers": {}, "body": f"Tunnel error: {e}"}).encode()
 
-    radio = MainNode(node, on_radio_request, RETRIES, RETRANSMIT_TIMEOUT)
+    radio = MainNode(node, on_radio_request)
     app   = FastAPI(title="Radio HTTP Tunnel")
 
     app.add_middleware(
